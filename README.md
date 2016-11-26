@@ -1,10 +1,7 @@
 # MastodonToTwitter
 Mastodon -> Twitter cross-poster.
 
-Requirements:
-
-    # Python 2
-    pip install Mastodon.py python-twitter
+Requirements: Python 3.4 minimum, with two packages:
 
     # Python 3
     pip3 install Mastodon.py python-twitter
