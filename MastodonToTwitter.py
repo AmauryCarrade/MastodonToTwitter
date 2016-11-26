@@ -23,6 +23,25 @@ MASTODON_POLL_DELAY = 30
 # The Mastodon instance base URL. By default, https://mastodon.social/
 MASTODON_BASE_URL = "https://mastodon.social"
 
+# Some helpers copied out from python-twitter, because they're broken there
+URL_REGEXP = re.compile((
+    r'('
+    r'(?!(https?://|www\.)?\.|ftps?://|([0-9]+\.){{1,3}}\d+)'  # exclude urls that start with "."
+    r'(?:https?://|www\.)*(?!.*@)(?:[\w+-_]+[.])'              # beginning of url
+    r'(?:{0}\b|'                                                # all tlds
+    r'(?:[:0-9]))'                                              # port numbers & close off TLDs
+    r'(?:[\w+\/]?[a-z0-9!\*\'\(\);:&=\+\$/%#\[\]\-_\.,~?])*'    # path/query params
+r')').format(r'\b|'.join(twitter.twitter_utils.TLDS)), re.U | re.I | re.X)
+
+def calc_expected_status_length(status, short_url_length=23):
+    replaced_chars = 0
+    status_length = len(status)
+    match = re.findall(URL_REGEXP, status)
+    if len(match) >= 1:
+        replaced_chars = len(''.join(map(lambda x: x[0], match)))
+        status_length = status_length - replaced_chars + (short_url_length * len(match))
+    return status_length
+
 # Boot-strap app and user information
 if not os.path.isfile("mtt_twitter.secret"):
     print("This appears to be your first time running MastodonToTwitter.")
@@ -176,7 +195,8 @@ while True:
             media_attachments = toot["media_attachments"]
 
             # We trust mastodon to return valid HTML
-            content_clean = html.unescape(str(re.compile(r'<.*?>').sub("", content).strip()))
+            content_clean = re.sub(r'<a [^>]*href="([^"]+)">[^<]*</a>', '\g<1>', content)
+            content_clean = html.unescape(str(re.compile(r'<.*?>').sub("", content_clean).strip()))
             
             # Don't cross-post replies
             if len(content_clean) != 0 and content_clean[0] == '@':
@@ -185,14 +205,14 @@ while True:
             
             # Split toots, if need be, using Many magic numbers.
             content_parts = []
-            if twitter.twitter_utils.calc_expected_status_length(content_clean) > 140:
+            if calc_expected_status_length(content_clean) > 140:
                 print('Toot bigger 140 characters, need to split...')
                 current_part = ""
                 for next_word in content_clean.split(" "):
                     # Need to split here?
-                    if twitter.twitter_utils.calc_expected_status_length(current_part + " " + next_word) > 135:
+                    if calc_expected_status_length(current_part + " " + next_word) > 135:
                         print("new part")
-                        space_left = 135 - twitter.twitter_utils.calc_expected_status_length(current_part) - 1
+                        space_left = 135 - calc_expected_status_length(current_part) - 1
 
                         # Want to split word?
                         if len(next_word) > 30 and space_left > 5 and not twitter.twitter_utils.is_url(next_word):                         
