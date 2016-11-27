@@ -268,6 +268,8 @@ while True:
                             os.unlink(upload_file_name)
 
                         content_tweet = content_parts[i]
+                        # Trim media urls from tweet
+                        content_tweet = re.sub(r"(http(s)?:\/\/)?mastodon.social\/media\/(\d)+(\s|$)+", "", content_tweet)
 
                     # Tweet
                     if len(media_ids) == 0:
