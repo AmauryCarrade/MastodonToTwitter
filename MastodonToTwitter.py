@@ -23,6 +23,9 @@ MASTODON_POLL_DELAY = 30
 # The Mastodon instance base URL. By default, https://mastodon.social/
 MASTODON_BASE_URL = "https://mastodon.social"
 
+# Media regex, to trim media URLs
+MEDIA_REGEXP = re.compile(re.escape(MASTODON_BASE_URL.rstrip("/")) + "\/media\/(\d)+(\s|$)+")
+
 # Some helpers copied out from python-twitter, because they're broken there
 URL_REGEXP = re.compile((
     r'('
@@ -197,6 +200,9 @@ while True:
             # We trust mastodon to return valid HTML
             content_clean = re.sub(r'<a [^>]*href="([^"]+)">[^<]*</a>', '\g<1>', content)
             content_clean = html.unescape(str(re.compile(r'<.*?>').sub("", content_clean).strip()))
+            
+            # Trim out media URLs
+            content_clean = re.sub(MEDIA_REGEXP, "", content_clean)
             
             # Don't cross-post replies
             if len(content_clean) != 0 and content_clean[0] == '@':
