@@ -23,6 +23,12 @@ MASTODON_POLL_DELAY = 30
 # The Mastodon instance base URL. By default, https://mastodon.social/
 MASTODON_BASE_URL = "https://mastodon.social"
 
+# How often to retry when posting fails
+MASTODON_RETRIES = 3
+
+# How long to wait between retrues, in seconds
+MASTODON_RETRY_DELAY = 20
+
 # Media regex, to trim media URLs
 MEDIA_REGEXP = re.compile(re.escape(MASTODON_BASE_URL.rstrip("/")) + "\/media\/(\d)+(\s|$)+")
 
@@ -36,7 +42,7 @@ URL_REGEXP = re.compile((
     r'(?:[\w+\/]?[a-z0-9!\*\'\(\);:&=\+\$/%#\[\]\-_\.,~?])*'    # path/query params
 r')').format(r'\b|'.join(twitter.twitter_utils.TLDS)), re.U | re.I | re.X)
 
-def calc_expected_status_length(status, short_url_length=23):
+def calc_expected_status_length(status, short_url_length = 23):
     replaced_chars = 0
     status_length = len(status)
     match = re.findall(URL_REGEXP, status)
@@ -167,7 +173,7 @@ with open("mtt_twitter.secret", 'r') as secret_file:
     TWITTER_CONSUMER_SECRET = secret_file.readline().rstrip()
     TWITTER_ACCESS_KEY = secret_file.readline().rstrip()
     TWITTER_ACCESS_SECRET = secret_file.readline().rstrip()
-	
+
 # Log in and start up
 mastodon_api = Mastodon(
     client_id = "mtt_mastodon_client.secret", 
@@ -185,7 +191,17 @@ twitter_api = twitter.Api(
 my_acct_id = mastodon_api.account_verify_credentials()["id"]
 since_toot_id = mastodon_api.account_statuses(my_acct_id)[0]["id"]
 
+# Set "last URL length update" time to 1970
+last_url_len_update = 0
+
 while True:
+    # Fetch twitter short URL length, if needed
+    if time.time() - last_url_len_update > 60 * 60 * 24:
+        twitter_api._config = None
+        url_length = max(twitter_api.GetShortUrlLength(False), twitter_api.GetShortUrlLength(True)) + 1
+        last_url_len_update = time.time()
+        print("Updated expected short URL length: Is now " + str(url_length))
+        
     # Fetch new toots
     new_toots = mastodon_api.account_statuses(my_acct_id, since_id = since_toot_id)
     if len(new_toots) != 0:
@@ -211,14 +227,14 @@ while True:
             
             # Split toots, if need be, using Many magic numbers.
             content_parts = []
-            if calc_expected_status_length(content_clean) > 140:
+            if calc_expected_status_length(content_clean, short_url_length = url_length) > 140:
                 print('Toot bigger 140 characters, need to split...')
                 current_part = ""
                 for next_word in content_clean.split(" "):
                     # Need to split here?
-                    if calc_expected_status_length(current_part + " " + next_word) > 135:
+                    if calc_expected_status_length(current_part + " " + next_word, short_url_length = url_length) > 135:
                         print("new part")
-                        space_left = 135 - calc_expected_status_length(current_part) - 1
+                        space_left = 135 - calc_expected_status_length(current_part, short_url_length = url_length) - 1
 
                         # Want to split word?
                         if len(next_word) > 30 and space_left > 5 and not twitter.twitter_utils.is_url(next_word):                         
@@ -275,15 +291,31 @@ while True:
 
                         content_tweet = content_parts[i]
 
-                    # Tweet
-                    if len(media_ids) == 0:
-                        print('Tweeting "' + content_tweet + '"...')
-                        reply_to = twitter_api.PostUpdate(content_tweet, in_reply_to_status_id = reply_to).id
-                    else:
-                        print('Tweeting "' + content_tweet + '", with attachments...')
-                        reply_to = twitter_api.PostUpdate(content_tweet, media = media_ids, in_reply_to_status_id = reply_to).id
+                    # Some final cleaning
+                    content_tweet = content_tweet.strip()
+                    
+                    # Retry three times before giving up
+                    retry_counter = 0
+                    post_success = False
+                    while post_success == False:
+                        try:
+                            # Tweet
+                            if len(media_ids) == 0:
+                                print('Tweeting "' + content_tweet + '"...')
+                                reply_to = twitter_api.PostUpdate(content_tweet, in_reply_to_status_id = reply_to).id
+                                post_success = True
+                            else:
+                                print('Tweeting "' + content_tweet + '", with attachments...')
+                                reply_to = twitter_api.PostUpdate(content_tweet, media = media_ids, in_reply_to_status_id = reply_to).id
+                                post_success = True
+                        except:
+                            if retry_counter < MASTODON_RETRIES:
+                                retry_counter += 1
+                                time.sleep(MASTODON_RETRY_DELAY)
+                            else:
+                                raise
             except:
-                print("Encountererd error. Not retrying.")
+                print("Encountererd error after three retries. Not retrying.")
                 
         print('Finished toot processing, resting until next toots.')
     time.sleep(MASTODON_POLL_DELAY)
