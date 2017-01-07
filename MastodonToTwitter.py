@@ -17,17 +17,19 @@ from builtins import input
 from mastodon import Mastodon
 import twitter
 
-# How long to wait between polls to the API, in seconds
-MASTODON_POLL_DELAY = 30
+# How long to wait between polls to the APIs, in seconds
+API_POLL_DELAY = 30
 
 # The Mastodon instance base URL. By default, https://mastodon.social/
 MASTODON_BASE_URL = "https://mastodon.social"
 
 # How often to retry when posting fails
 MASTODON_RETRIES = 3
+TWITTER_RETRIES = 3
 
-# How long to wait between retrues, in seconds
+# How long to wait between retries, in seconds
 MASTODON_RETRY_DELAY = 20
+TWITTER_RETRY_DELAY = 20
 
 # Media regex, to trim media URLs
 MEDIA_REGEXP = re.compile(re.escape(MASTODON_BASE_URL.rstrip("/")) + "\/media\/(\d)+(\s|$)+")
@@ -117,7 +119,7 @@ if not os.path.isfile("mtt_twitter.secret"):
                 Mastodon.create_app(
                     "MastodonToTwitter", 
                     to_file = "mtt_mastodon_client.secret", 
-                    scopes = ["read"], 
+                    scopes = ["read", "write"],
                     api_base_url = MASTODON_BASE_URL
                 )
             except:
@@ -138,7 +140,7 @@ if not os.path.isfile("mtt_twitter.secret"):
                 username = MASTODON_USERNAME, 
                 password = MASTODON_PASSWORD, 
                 to_file = "mtt_mastodon_user.secret",
-                scopes = ["read"]
+                scopes = ["read", "write"]
             )
         except:
             mastodon_works = False
@@ -185,11 +187,16 @@ twitter_api = twitter.Api(
     consumer_key = TWITTER_CONSUMER_KEY,
     consumer_secret = TWITTER_CONSUMER_SECRET,
     access_token_key = TWITTER_ACCESS_KEY,
-    access_token_secret = TWITTER_ACCESS_SECRET
+    access_token_secret = TWITTER_ACCESS_SECRET,
+    tweet_mode = 'extended' # Allow tweets longer than 140 raw characters
 )
 
-my_acct_id = mastodon_api.account_verify_credentials()["id"]
-since_toot_id = mastodon_api.account_statuses(my_acct_id)[0]["id"]
+ma_account_id = mastodon_api.account_verify_credentials()["id"]
+since_toot_id = mastodon_api.account_statuses(ma_account_id)[0]["id"]
+print("Tweeting any toots after toot " + str(since_toot_id))
+since_tweet_id = twitter_api.GetUserTimeline()[0].id
+since_tweet_id = 817816640859406336
+print("Tooting any tweets after tweet " + str(since_tweet_id))
 
 # Set "last URL length update" time to 1970
 last_url_len_update = 0
@@ -203,7 +210,7 @@ while True:
         print("Updated expected short URL length: Is now " + str(url_length))
         
     # Fetch new toots
-    new_toots = mastodon_api.account_statuses(my_acct_id, since_id = since_toot_id)
+    new_toots = mastodon_api.account_statuses(ma_account_id, since_id = since_toot_id)
     if len(new_toots) != 0:
         since_toot_id = new_toots[0]["id"]
         new_toots.reverse()    
@@ -303,10 +310,12 @@ while True:
                             if len(media_ids) == 0:
                                 print('Tweeting "' + content_tweet + '"...')
                                 reply_to = twitter_api.PostUpdate(content_tweet, in_reply_to_status_id = reply_to).id
+                                since_tweet_id = reply_to
                                 post_success = True
                             else:
                                 print('Tweeting "' + content_tweet + '", with attachments...')
                                 reply_to = twitter_api.PostUpdate(content_tweet, media = media_ids, in_reply_to_status_id = reply_to).id
+                                since_tweet_id = reply_to
                                 post_success = True
                         except:
                             if retry_counter < MASTODON_RETRIES:
@@ -315,7 +324,77 @@ while True:
                             else:
                                 raise
             except:
-                print("Encountererd error after three retries. Not retrying.")
+                print("Encountered error after " + str(MASTODON_RETRIES) + " retries. Not retrying.")
                 
         print('Finished toot processing, resting until next toots.')
-    time.sleep(MASTODON_POLL_DELAY)
+
+    # Fetch new tweets
+    new_tweets = twitter_api.GetUserTimeline(since_id = since_tweet_id, include_rts=False, exclude_replies=True)
+    if len(new_tweets) != 0:
+        since_tweet_id = new_tweets[0].id
+
+        print('Found new tweets, processing:')
+        for tweet in new_tweets:
+            content = tweet.full_text
+            media_attachments = tweet.media
+            urls = tweet.urls
+            sensitive = tweet.possibly_sensitive
+
+            content_toot = content
+            media_ids = []
+
+            if urls:
+                for url in urls:
+                    # Unshorten URLs
+                    content_toot = re.sub(url.url, url.expanded_url, content_toot)
+
+            if media_attachments:
+                for attachment in media_attachments:
+                    # Remove the t.co link to the media
+                    content_toot = re.sub(attachment.url, "", content_toot)
+
+                    attachment_url = attachment.media_url
+
+                    print('Downloading ' + attachment_url)
+                    attachment_file = requests.get(attachment_url, stream=True)
+                    attachment_file.raw.decode_content = True
+                    temp_file = tempfile.NamedTemporaryFile(delete = False)
+                    temp_file.write(attachment_file.raw.read())
+                    temp_file.close()
+
+                    file_extension = mimetypes.guess_extension(attachment_file.headers['Content-type'])
+                    upload_file_name = temp_file.name + file_extension
+                    os.rename(temp_file.name, upload_file_name)
+
+                    print('Uploading ' + upload_file_name)
+                    media_ids.append(mastodon_api.media_post(upload_file_name))
+                    os.unlink(upload_file_name)
+
+            try:
+                retry_counter = 0
+                post_success = False
+                while post_success == False:
+                    try:
+                        # Toot
+                        if len(media_ids) == 0:
+                            print('Tooting "' + content_toot + '"...')
+                            post = mastodon_api.status_post(content_toot)
+                            since_toot_id = post["id"]
+                            post_success = True
+                        else:
+                            print('Tooting "' + content_toot + '", with attachments...')
+                            post = mastodon_api.status_post(content_toot, media_ids=media_ids)
+                            since_toot_id = post["id"]
+                            post_success = True
+                    except:
+                        if retry_counter < TWITTER_RETRIES:
+                            retry_counter += 1
+                            time.sleep(TWITTER_RETRY_DELAY)
+                        else:
+                            raise
+            except:
+                print("Encountered error after " + str(TWITTER_RETRIES) + " retries. Not retrying.")
+
+        print('Finished tweet processing, resting until next tweets.')
+
+    time.sleep(API_POLL_DELAY)
