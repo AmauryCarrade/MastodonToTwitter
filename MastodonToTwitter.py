@@ -32,7 +32,7 @@ MASTODON_RETRY_DELAY = 20
 TWITTER_RETRY_DELAY = 20
 
 # Media regex, to trim media URLs
-MEDIA_REGEXP = re.compile(re.escape(MASTODON_BASE_URL.rstrip("/")) + "\/media\/(\d)+(\s|$)+")
+MEDIA_REGEXP = re.compile(re.escape(MASTODON_BASE_URL.rstrip("/")) + "\/media\/(\w)+(\s|$)+")
 
 # Some helpers copied out from python-twitter, because they're broken there
 URL_REGEXP = re.compile((
