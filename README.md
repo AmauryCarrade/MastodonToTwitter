@@ -18,7 +18,7 @@ twitter and Mastodon accounts, so do not share them around.
 
 ## Docker
 
-To run this as a docker app, first run the app once to generate the mstt files, then build the docker container:
+To run this as a docker app, first run the app once to generate the mtt files, then build the docker container:
 ```
 docker build -t "mastodontotwitter" .
 ```
