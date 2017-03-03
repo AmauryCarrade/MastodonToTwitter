@@ -10,5 +10,4 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 # Copy source
 COPY ["MastodonToTwitter.py", "mtt_mastodon_client.secret", "mtt_mastodon_user.secret","mtt_twitter.secret","./"]
 
-ENTRYPOINT ["python"]
-CMD [ "MastodonToTwitter.py" ]
+CMD ["python","-u","MastodonToTwitter.py" ]
