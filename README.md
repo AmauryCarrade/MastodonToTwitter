@@ -15,3 +15,15 @@ settings in the script.
 The script stores your credentials in a bunch of files ending
 on .secret. The contents of these files let people access your
 twitter and Mastodon accounts, so do not share them around.
+
+## Docker
+
+To run this as a docker app, first run the app once to generate the mtt files, then build the docker container:
+```
+docker build -t "mastodontotwitter" .
+```
+Now you can run it:
+```
+docker run -d --name "mastodontotwitter" mastodontotwitter
+```
+
