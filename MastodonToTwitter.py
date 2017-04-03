@@ -21,11 +21,14 @@ import twitter
 POST_ON_MASTODON = True
 POST_ON_TWITTER = True
 
+# Manage visibility of your toot. Value are "private", "unlisted" or "public"
+TOOT_VISIBILITY = "unlisted"
+
 # How long to wait between polls to the APIs, in seconds
 API_POLL_DELAY = 30
 
 # The Mastodon instance base URL. By default, https://mastodon.social/
-MASTODON_BASE_URL = "https://hostux.social/"
+MASTODON_BASE_URL = "https://mastodon.social"
 
 # How often to retry when posting fails
 MASTODON_RETRIES = 3
@@ -385,12 +388,12 @@ while True:
                         # Toot
                         if len(media_ids) == 0:
                             print('Tooting "' + content_toot + '"...')
-                            post = mastodon_api.status_post(content_toot)
+                            post = mastodon_api.status_post(content_toot, visibility=TOOT_VISIBILITY)
                             since_toot_id = post["id"]
                             post_success = True
                         else:
                             print('Tooting "' + content_toot + '", with attachments...')
-                            post = mastodon_api.status_post(content_toot, media_ids=media_ids)
+                            post = mastodon_api.status_post(content_toot, media_ids=media_ids, visibility=TOOT_VISIBILITY)
                             since_toot_id = post["id"]
                             post_success = True
                     except:
