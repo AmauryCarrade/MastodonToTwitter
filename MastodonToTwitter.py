@@ -17,11 +17,15 @@ from builtins import input
 from mastodon import Mastodon
 import twitter
 
+# Enable repost on services
+POST_ON_MASTODON = True
+POST_ON_TWITTER = True
+
 # How long to wait between polls to the APIs, in seconds
 API_POLL_DELAY = 30
 
 # The Mastodon instance base URL. By default, https://mastodon.social/
-MASTODON_BASE_URL = "https://mastodon.social"
+MASTODON_BASE_URL = "https://hostux.social/"
 
 # How often to retry when posting fails
 MASTODON_RETRIES = 3
@@ -209,7 +213,9 @@ while True:
         print("Updated expected short URL length: Is now " + str(url_length))
         
     # Fetch new toots
-    new_toots = mastodon_api.account_statuses(ma_account_id, since_id = since_toot_id)
+    new_toots = []
+    if POST_ON_TWITTER:
+        new_toots = mastodon_api.account_statuses(ma_account_id, since_id = since_toot_id)
     if len(new_toots) != 0:
         since_toot_id = new_toots[0]["id"]
         new_toots.reverse()    
@@ -328,7 +334,9 @@ while True:
         print('Finished toot processing, resting until next toots.')
 
     # Fetch new tweets
-    new_tweets = twitter_api.GetUserTimeline(since_id = since_tweet_id, include_rts=False, exclude_replies=True)
+    new_tweets = []
+    if POST_ON_MASTODON:
+        new_tweets = twitter_api.GetUserTimeline(since_id = since_tweet_id, include_rts=False, exclude_replies=True)
     if len(new_tweets) != 0:
         since_tweet_id = new_tweets[0].id
 
