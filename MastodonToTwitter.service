@@ -1,0 +1,14 @@
+[Unit]
+Description=crossposter mastodon <-> twitter
+After=network.target
+
+[Service]
+Type=simple
+User=wxcafe
+WorkingDirectory={INSTALLATION PATH HERE}
+ExecStart=/usr/bin/python3 {INSTALLATION PATH HERE}/MastodonToTwitter.py
+TimeoutSec=15
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
