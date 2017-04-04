@@ -17,6 +17,13 @@ from builtins import input
 from mastodon import Mastodon
 import twitter
 
+# Enable repost on services
+POST_ON_MASTODON = True
+POST_ON_TWITTER = True
+
+# Manage visibility of your toot. Value are "private", "unlisted" or "public"
+TOOT_VISIBILITY = "unlisted"
+
 # How long to wait between polls to the APIs, in seconds
 API_POLL_DELAY = 30
 
@@ -209,7 +216,9 @@ while True:
         print("Updated expected short URL length: Is now " + str(url_length))
         
     # Fetch new toots
-    new_toots = mastodon_api.account_statuses(ma_account_id, since_id = since_toot_id)
+    new_toots = []
+    if POST_ON_TWITTER:
+        new_toots = mastodon_api.account_statuses(ma_account_id, since_id = since_toot_id)
     if len(new_toots) != 0:
         since_toot_id = new_toots[0]["id"]
         new_toots.reverse()    
@@ -328,7 +337,9 @@ while True:
         print('Finished toot processing, resting until next toots.')
 
     # Fetch new tweets
-    new_tweets = twitter_api.GetUserTimeline(since_id = since_tweet_id, include_rts=False, exclude_replies=True)
+    new_tweets = []
+    if POST_ON_MASTODON:
+        new_tweets = twitter_api.GetUserTimeline(since_id = since_tweet_id, include_rts=False, exclude_replies=True)
     if len(new_tweets) != 0:
         since_tweet_id = new_tweets[0].id
 
@@ -377,12 +388,12 @@ while True:
                         # Toot
                         if len(media_ids) == 0:
                             print('Tooting "' + content_toot + '"...')
-                            post = mastodon_api.status_post(content_toot)
+                            post = mastodon_api.status_post(content_toot, visibility=TOOT_VISIBILITY)
                             since_toot_id = post["id"]
                             post_success = True
                         else:
                             print('Tooting "' + content_toot + '", with attachments...')
-                            post = mastodon_api.status_post(content_toot, media_ids=media_ids)
+                            post = mastodon_api.status_post(content_toot, media_ids=media_ids, visibility=TOOT_VISIBILITY)
                             since_toot_id = post["id"]
                             post_success = True
                     except:
