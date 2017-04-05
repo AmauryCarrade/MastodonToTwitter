@@ -4,7 +4,8 @@ After=network.target
 
 [Service]
 Type=simple
-User=wxcafe
+User={USER NAME HERE}
+Environment=LC_ALL=en_US.UTF-8
 WorkingDirectory={INSTALLATION PATH HERE}
 ExecStart=/usr/bin/python3 {INSTALLATION PATH HERE}/MastodonToTwitter.py
 TimeoutSec=15
