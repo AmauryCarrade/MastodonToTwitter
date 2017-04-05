@@ -125,9 +125,9 @@ if not os.path.isfile("mtt_twitter.secret"):
 
         print("\n")
         if os.path.isfile("mtt_mastodon_server.secret"):
-            print("You already have mastodon server set up, so we're skipping that step.")
+            print("You already have Mastodon server set up, so we're skipping that step.")
         else:
-            print("Recording mastodon server...")
+            print("Recording Mastodon server...")
             try:
                 with open("mtt_mastodon_server.secret", "w") as mastodon_server:
                     mastodon_server.write(MASTODON_BASE_URL)
