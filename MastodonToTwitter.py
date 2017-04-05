@@ -124,6 +124,19 @@ if not os.path.isfile("mtt_twitter.secret"):
             MASTODON_BASE_URL = 'https://' + MASTODON_BASE_URL
 
         print("\n")
+        if os.path.isfile("mtt_mastodon_server.secret"):
+            print("You already have mastodon server set up, so we're skipping that step.")
+        else:
+            print("Recording mastodon server...")
+            try:
+                with open("mtt_mastodon_server.secret", "w") as mastodon_server:
+                    mastodon_server.write(MASTODON_BASE_URL)
+            except OSError as e:
+                print("... but it failed.", e)
+                sys.exit(-1)
+                mastodon_works = False
+
+        print("\n")
         if os.path.isfile("mtt_mastodon_client.secret"):
             print("You already have an app set up, so we're skipping that step.")
         else:
@@ -189,6 +202,10 @@ with open("mtt_twitter.secret", 'r') as secret_file:
     TWITTER_CONSUMER_SECRET = secret_file.readline().rstrip()
     TWITTER_ACCESS_KEY = secret_file.readline().rstrip()
     TWITTER_ACCESS_SECRET = secret_file.readline().rstrip()
+
+# Read in Mastodon server
+with open("mtt_mastodon_server.secret", 'r') as secret_file:
+    MASTODON_BASE_URL = secret_file.readline().rstrip()
 
 # Log in and start up
 mastodon_api = Mastodon(
