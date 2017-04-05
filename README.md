@@ -27,3 +27,10 @@ Now you can run it:
 docker run -d --name "mastodontotwitter" mastodontotwitter
 ```
 
+## Systemd
+
+The `MastodonToTwitter.service` file is a systemd service.
+You can edit it to change the install path, copy it to `/etc/systemd/system/`,
+and then use `systemctl start|stop|restart|status MastodonToTwitter` and
+`journalctl -u MastodonToTwitter.service` to run this as a simple service
+
