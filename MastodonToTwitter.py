@@ -110,11 +110,11 @@ if not os.path.isfile("mtt_twitter.secret"):
 
     mastodon_works = False
     while mastodon_works == False:
-        MASTODON_BASE_URL = input("Mastodon server (press Enter for mastodon.social): https://").strip()
+        MASTODON_BASE_URL = 'https://' + input("Mastodon server (press Enter for mastodon.social): https://").strip()
         MASTODON_USERNAME = input("Mastodon Username (e-mail): ").strip()
         MASTODON_PASSWORD = getpass.getpass("Mastodon Password: ").strip()
 
-        if MASTODON_BASE_URL == '':
+        if MASTODON_BASE_URL == 'https://':
             # The Mastodon instance base URL. By default, https://mastodon.social/
             MASTODON_BASE_URL = "https://mastodon.social"
 
