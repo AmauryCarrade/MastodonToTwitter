@@ -199,7 +199,10 @@ twitter_api = twitter.Api(
 )
 
 ma_account_id = mastodon_api.account_verify_credentials()["id"]
-since_toot_id = mastodon_api.account_statuses(ma_account_id)[0]["id"]
+try:
+    since_toot_id = mastodon_api.account_statuses(ma_account_id)[0]["id"]
+except:
+    since_toot_id = 0
 print("Tweeting any toots after toot " + str(since_toot_id))
 since_tweet_id = twitter_api.GetUserTimeline()[0].id
 print("Tooting any tweets after tweet " + str(since_tweet_id))
