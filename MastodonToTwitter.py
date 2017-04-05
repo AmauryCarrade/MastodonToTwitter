@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # coding: utf-8
 
 """
@@ -12,6 +13,7 @@ import tempfile
 import os
 import mimetypes
 import sys
+import getpass
 from builtins import input
 
 from mastodon import Mastodon
@@ -27,9 +29,6 @@ TOOT_VISIBILITY = "unlisted"
 # How long to wait between polls to the APIs, in seconds
 API_POLL_DELAY = 30
 
-# The Mastodon instance base URL. By default, https://mastodon.social/
-MASTODON_BASE_URL = "https://mastodon.social"
-
 # How often to retry when posting fails
 MASTODON_RETRIES = 3
 TWITTER_RETRIES = 3
@@ -39,7 +38,7 @@ MASTODON_RETRY_DELAY = 20
 TWITTER_RETRY_DELAY = 20
 
 # Media regex, to trim media URLs
-MEDIA_REGEXP = re.compile(re.escape(MASTODON_BASE_URL.rstrip("/")) + "\/media\/(\w)+(\s|$)+")
+MASTODON_BASE_URL = ''
 
 # Some helpers copied out from python-twitter, because they're broken there
 URL_REGEXP = re.compile((
@@ -85,23 +84,23 @@ if not os.path.isfile("mtt_twitter.secret"):
         TWITTER_CONSUMER_SECRET = input("Twitter Consumer Secret (API Secret): ").strip()
         TWITTER_ACCESS_KEY = input("Twitter Access Token: ").strip()
         TWITTER_ACCESS_SECRET = input("Twitter Access Token Secret: ").strip()
-        
+
         print("\n")
         print("Alright, trying to connect to twitter with those credentials...")
         print("\n")
-                
+
         try:
-            twitter_works = True            
+            twitter_works = True
             twitter_api = twitter.Api(
                 consumer_key = TWITTER_CONSUMER_KEY,
                 consumer_secret = TWITTER_CONSUMER_SECRET,
                 access_token_key = TWITTER_ACCESS_KEY,
                 access_token_secret = TWITTER_ACCESS_SECRET
             )
-            twitter_api.VerifyCredentials()            
+            twitter_api.VerifyCredentials()
         except:
             twitter_works = False
-            
+
         if twitter_works == False:
             print("Hmm, that didn't work. Check if you copied everything correctly")
             print("and make sure you are connected to the internet.")
@@ -114,8 +113,15 @@ if not os.path.isfile("mtt_twitter.secret"):
 
     mastodon_works = False
     while mastodon_works == False:
+        MASTODON_BASE_URL = input("Mastodon server (e.g. mastodon.social): ").strip()
         MASTODON_USERNAME = input("Mastodon Username (e-mail): ").strip()
-        MASTODON_PASSWORD = input("Mastodon Password: ").strip()
+        MASTODON_PASSWORD = getpass.getpass("Mastodon Password: ").strip()
+
+        if MASTODON_BASE_URL == '':
+            # The Mastodon instance base URL. By default, https://mastodon.social/
+            MASTODON_BASE_URL = "https://mastodon.social"
+        elif not MASTODON_BASE_URL.startswith('https://'):
+            MASTODON_BASE_URL = 'https://' + MASTODON_BASE_URL
 
         print("\n")
         if os.path.isfile("mtt_mastodon_client.secret"):
@@ -124,39 +130,40 @@ if not os.path.isfile("mtt_twitter.secret"):
             print("App creation should be automatic...")
             try:
                 Mastodon.create_app(
-                    "MastodonToTwitter", 
-                    to_file = "mtt_mastodon_client.secret", 
+                    "MastodonToTwitter",
+                    to_file = "mtt_mastodon_client.secret",
                     scopes = ["read", "write"],
                     api_base_url = MASTODON_BASE_URL
                 )
-            except:
+            except Exception as e:
                 print("... but it failed. That shouldn't really happen. Please retry ")
                 print("from the start, and if it keeps not working, submit a bug report at")
                 print("http://github.com/halcy/MastodonToTwitter .")
-                sys.exit(0)
+                print(e)
+                sys.exit(-1)
             print("...done! Next up, lets verify your login data.")
         print("\n")
-        
+
         try:
             mastodon_works = True
             mastodon_api = Mastodon(
-                client_id = "mtt_mastodon_client.secret", 
+                client_id = "mtt_mastodon_client.secret",
                 api_base_url = MASTODON_BASE_URL
             )
             mastodon_api.log_in(
-                username = MASTODON_USERNAME, 
-                password = MASTODON_PASSWORD, 
+                username = MASTODON_USERNAME,
+                password = MASTODON_PASSWORD,
                 to_file = "mtt_mastodon_user.secret",
                 scopes = ["read", "write"]
             )
         except:
             mastodon_works = False
-        
+
         if mastodon_works == False:
             print("Logging in didn't work. Check if you typed something wrong")
             print("and make sure you are connected to the internet.")
             print("\n")
-            
+
     print("Alright, then, looks like you're all set!")
     print("\n")
     print("Your credentials have been saved to three files ending in .secret in the")
@@ -169,7 +176,7 @@ if not os.path.isfile("mtt_twitter.secret"):
     print("won't see any of these messages. To start over, simply delete all the .secret")
     print("files. Have fun tooting!")
     print("\n")
-          
+
     with open("mtt_twitter.secret", 'w') as secret_file:
         secret_file.write(TWITTER_CONSUMER_KEY + '\n')
         secret_file.write(TWITTER_CONSUMER_SECRET + '\n')
@@ -185,8 +192,8 @@ with open("mtt_twitter.secret", 'r') as secret_file:
 
 # Log in and start up
 mastodon_api = Mastodon(
-    client_id = "mtt_mastodon_client.secret", 
-    access_token = "mtt_mastodon_user.secret", 
+    client_id = "mtt_mastodon_client.secret",
+    access_token = "mtt_mastodon_user.secret",
     ratelimit_method="wait",
     api_base_url = MASTODON_BASE_URL
 )
@@ -214,15 +221,16 @@ while True:
         url_length = max(twitter_api.GetShortUrlLength(False), twitter_api.GetShortUrlLength(True)) + 1
         last_url_len_update = time.time()
         print("Updated expected short URL length: Is now " + str(url_length))
-        
+
     # Fetch new toots
     new_toots = []
     if POST_ON_TWITTER:
         new_toots = mastodon_api.account_statuses(ma_account_id, since_id = since_toot_id)
     if len(new_toots) != 0:
         since_toot_id = new_toots[0]["id"]
-        new_toots.reverse()    
-        
+        new_toots.reverse()
+        MEDIA_REGEXP = re.compile(re.escape(MASTODON_BASE_URL.rstrip("/")) + "\/media\/(\w)+(\s|$)+")
+
         print('Found new toots, processing:')
         for toot in new_toots:
             content = toot["content"]
@@ -231,15 +239,15 @@ while True:
             # We trust mastodon to return valid HTML
             content_clean = re.sub(r'<a [^>]*href="([^"]+)">[^<]*</a>', '\g<1>', content)
             content_clean = html.unescape(str(re.compile(r'<.*?>').sub("", content_clean).strip()))
-            
+
             # Trim out media URLs
             content_clean = re.sub(MEDIA_REGEXP, "", content_clean)
-            
+
             # Don't cross-post replies
             if len(content_clean) != 0 and content_clean[0] == '@':
                 print('Skipping toot "' + content_clean + '" - is a reply.')
                 continue
-            
+
             # Split toots, if need be, using Many magic numbers.
             content_parts = []
             if calc_expected_status_length(content_clean, short_url_length = url_length) > 140:
@@ -252,7 +260,7 @@ while True:
                         space_left = 135 - calc_expected_status_length(current_part, short_url_length = url_length) - 1
 
                         # Want to split word?
-                        if len(next_word) > 30 and space_left > 5 and not twitter.twitter_utils.is_url(next_word):                         
+                        if len(next_word) > 30 and space_left > 5 and not twitter.twitter_utils.is_url(next_word):
                             current_part = current_part + " " + next_word[:space_left]
                             content_parts.append(current_part)
                             current_part = next_word[space_left:]
@@ -263,21 +271,21 @@ while True:
                         # Split potential overlong word in current_part
                         while len(current_part) > 135:
                             content_parts.append(current_part[:135])
-                            current_part = current_part[135:]  
+                            current_part = current_part[135:]
                     else:
                         # Just plop next word on
                         current_part = current_part + " " + next_word
-                
+
                 # Insert last part
                 if len(current_part.strip()) != 0 or len(content_parts) == 0:
                     content_parts.append(current_part.strip())
             else:
                 print('Toot smaller 140 chars, posting directly...')
                 content_parts.append(content_clean)
-                    
+
             # Tweet all the parts. On error, give up and go on with the next toot.
             try:
-                reply_to = None            
+                reply_to = None
                 for i in range(len(content_parts)):
                     media_ids = []
                     content_tweet = content_parts[i] + " --"
@@ -308,7 +316,7 @@ while True:
 
                     # Some final cleaning
                     content_tweet = content_tweet.strip()
-                    
+
                     # Retry three times before giving up
                     retry_counter = 0
                     post_success = False
@@ -333,7 +341,7 @@ while True:
                                 raise
             except:
                 print("Encountered error after " + str(MASTODON_RETRIES) + " retries. Not retrying.")
-                
+
         print('Finished toot processing, resting until next toots.')
 
     # Fetch new tweets
