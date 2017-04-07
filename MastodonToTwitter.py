@@ -416,7 +416,7 @@ while True:
                             post_success = True
                         else:
                             print('Tooting "' + content_toot + '", with attachments...')
-                            post = mastodon_api.status_post(content_toot, media_ids=media_ids, visibility=TOOT_VISIBILITY)
+                            post = mastodon_api.status_post(content_toot, media_ids=media_ids, visibility=TOOT_VISIBILITY, sensitive=None)
                             since_toot_id = post["id"]
                             post_success = True
                     except:
