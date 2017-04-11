@@ -253,6 +253,8 @@ while True:
 
             # We trust mastodon to return valid HTML
             content_clean = re.sub(r'<a [^>]*href="([^"]+)">[^<]*</a>', '\g<1>', content)
+            # We replace html br with new lines
+            content_clean = "\n".join(re.compile(r'<br ?/?>', re.IGNORECASE).split(content_clean))
             content_clean = html.unescape(str(re.compile(r'<.*?>').sub("", content_clean).strip()))
 
             # Trim out media URLs
