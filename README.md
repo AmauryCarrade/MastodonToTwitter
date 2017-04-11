@@ -1,5 +1,5 @@
 # MastodonToTwitter
-Mastodon <-> Twitter cross-poster.
+Mastodon ))<>(( Twitter cross-poster.
 
 Requirements: Python 3.4 minimum, with two packages, python-twitter
 version 3.2 upwards and Mastodon.py version 1.0.2 upwards:
