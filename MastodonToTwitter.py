@@ -379,7 +379,7 @@ while True:
             urls = tweet.urls
             sensitive = tweet.possibly_sensitive
 
-            content_toot = content
+            content_toot = html.unescape(content)
             media_ids = []
 
             if urls:
