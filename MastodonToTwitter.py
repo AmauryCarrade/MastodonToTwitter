@@ -253,8 +253,12 @@ while True:
 
             # We trust mastodon to return valid HTML
             content_clean = re.sub(r'<a [^>]*href="([^"]+)">[^<]*</a>', '\g<1>', content)
+
             # We replace html br with new lines
             content_clean = "\n".join(re.compile(r'<br ?/?>', re.IGNORECASE).split(content_clean))
+            # We must also replace new paragraphs with double line skips
+            content_clean = "\n\n".join(re.compile(r'</p><p>', re.IGNORECASE).split(content_clean))
+            # Then we can delete the other html contents and unescape the string
             content_clean = html.unescape(str(re.compile(r'<.*?>').sub("", content_clean).strip()))
 
             # Trim out media URLs
@@ -375,7 +379,7 @@ while True:
             urls = tweet.urls
             sensitive = tweet.possibly_sensitive
 
-            content_toot = content
+            content_toot = html.unescape(content)
             media_ids = []
 
             if urls:
