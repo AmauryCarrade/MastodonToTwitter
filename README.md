@@ -34,3 +34,26 @@ You can edit it to change the install path, copy it to `/etc/systemd/system/`,
 and then use `systemctl start|stop|restart|status MastodonToTwitter` and
 `journalctl -u MastodonToTwitter.service` to run this as a simple service
 
+## Heroku
+
+You can run this on a free heroku dynamo 
+
+Add heroku as a remote repository with `heroku git:remote -a your-app-here`
+
+Create a `runtime.txt` file which contains:
+```
+python-3.6.1
+```
+Create a `Procfile` which contains 
+```
+worker: python3 MastodonToTwitter.py
+```
+Commit and push your changes to heroku master.
+
+Open a bash shell on heroku with `heroku run bash` and follow the basic usage instructions to generate your tokens.
+
+Exit bash and scale your heroku instance ` heroku ps:scale worker=1` to get things going.
+
+
+
+
