@@ -380,7 +380,13 @@ while True:
             sensitive = tweet.possibly_sensitive
 
             content_toot = html.unescape(content)
+            mentions = re.findall(r'[@]\S*', content_toot)
             media_ids = []
+
+            if mentions:
+                for mention in mentions:
+                    # Replace all mentions for an equivalent to clearly signal their origin on Twitter
+                    content_toot = re.sub(mention, mention + '@twitter.com', content_toot)
 
             if urls:
                 for url in urls:
