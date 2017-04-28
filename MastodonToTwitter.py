@@ -274,7 +274,6 @@ while True:
             # Split toots, if need be, using Many magic numbers.
             content_parts = []
             if calc_expected_status_length(content_clean, short_url_length = url_length) > 140:
-                if SPLIT_ON_TWITTER:
                     print('Toot bigger 140 characters, need to split...')
                     current_part = ""
                     for next_word in content_clean.split(" "):
@@ -283,31 +282,33 @@ while True:
                             print("new part")
                             space_left = 135 - calc_expected_status_length(current_part, short_url_length = url_length) - 1
 
-                            # Want to split word?
-                            if len(next_word) > 30 and space_left > 5 and not twitter.twitter_utils.is_url(next_word):
-                                current_part = current_part + " " + next_word[:space_left]
-                                content_parts.append(current_part)
-                                current_part = next_word[space_left:]
-                            else:
-                                content_parts.append(current_part)
-                                current_part = next_word
 
-                            # Split potential overlong word in current_part
-                            while len(current_part) > 135:
-                                content_parts.append(current_part[:135])
-                                current_part = current_part[135:]
+                            if SPLIT_ON_TWITTER:
+                                # Want to split word?
+                                if len(next_word) > 30 and space_left > 5 and not twitter.twitter_utils.is_url(next_word):
+                                    current_part = current_part + " " + next_word[:space_left]
+                                    content_parts.append(current_part)
+                                    current_part = next_word[space_left:]
+                                else:
+                                    content_parts.append(current_part)
+                                    current_part = next_word
+
+                                # Split potential overlong word in current_part
+                                while len(current_part) > 135:
+                                    content_parts.append(current_part[:135])
+                                    current_part = current_part[135:]
+                            else:
+                                print('In fact we just cut')
+                                space_for_suffix = len('… ') + url_length
+                                content_parts.append(current_part[:-space_for_suffix] + '… ' + toot['url'])
+                                current_part = ''
+                                break
                         else:
                             # Just plop next word on
                             current_part = current_part + " " + next_word
-
                     # Insert last part
                     if len(current_part.strip()) != 0 or len(content_parts) == 0:
                         content_parts.append(current_part.strip())
-                else:  # We just cut the end, to put a link to Mastodon
-                    print('Toot bigger 140 characters, need to cut...')
-                    cut_toot = content_clean[:-(2 + url_length)] + '… ' + toot['url']
-                    print('Cut toot is "' + cut_toot + '" length ' + str(len(cut_toot)))
-                    content_parts.append(cut_toot)
 
             else:
                 print('Toot smaller 140 chars, posting directly...')
@@ -318,7 +319,9 @@ while True:
                 reply_to = None
                 for i in range(len(content_parts)):
                     media_ids = []
-                    content_tweet = content_parts[i] + " --"
+                    content_tweet = content_parts[i]
+                    if SPLIT_ON_TWITTER:
+                        content_tweet += " --"
 
                     # Last content part: Upload media, no -- at the end
                     if i == len(content_parts) - 1:
