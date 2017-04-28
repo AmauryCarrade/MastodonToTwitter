@@ -263,7 +263,6 @@ while True:
             content_clean = "\n\n".join(re.compile(r'</p><p>', re.IGNORECASE).split(content_clean))
             # Then we can delete the other html contents and unescape the string
             content_clean = html.unescape(str(re.compile(r'<.*?>').sub("", content_clean).strip()))
-
             # Trim out media URLs
             content_clean = re.sub(MEDIA_REGEXP, "", content_clean)
 
@@ -304,9 +303,11 @@ while True:
                     # Insert last part
                     if len(current_part.strip()) != 0 or len(content_parts) == 0:
                         content_parts.append(current_part.strip())
-                else:  # We just cut the begining, to put a link to Mastodon
+                else:  # We just cut the end, to put a link to Mastodon
                     print('Toot bigger 140 characters, need to cut...')
-                    content_parts.append(content_clean[:-(2 + url_length)] + u'… ' + toot['url'])
+                    cut_toot = content_clean[:-(2 + url_length)] + '… ' + toot['url']
+                    print('Cut toot is "' + cut_toot + '" length ' + str(len(cut_toot)))
+                    content_parts.append(cut_toot)
 
             else:
                 print('Toot smaller 140 chars, posting directly...')
