@@ -306,7 +306,7 @@ while True:
                         content_parts.append(current_part.strip())
                 else:  # We just cut the begining, to put a link to Mastodon
                     print('Toot bigger 140 characters, need to cut...')
-                    content_parts.append(content_clean[:-(2 + url_length)] + '… ' + toot['url'])
+                    content_parts.append(content_clean[:-(2 + url_length)] + u'… ' + toot['url'])
 
             else:
                 print('Toot smaller 140 chars, posting directly...')
