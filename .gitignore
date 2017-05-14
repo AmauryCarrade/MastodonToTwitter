@@ -90,3 +90,4 @@ ENV/
 
 # Make sure nobody owns themselves
 *.secret
+*.json

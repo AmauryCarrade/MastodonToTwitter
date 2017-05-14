@@ -14,6 +14,7 @@ import os
 import mimetypes
 import sys
 import getpass
+import json
 from builtins import input
 
 from mastodon import Mastodon
@@ -218,6 +219,7 @@ twitter_api = twitter.Api(
 )
 
 ma_account_id = mastodon_api.account_verify_credentials()["id"]
+tw_account_id = twitter_api.VerifyCredentials().id
 try:
     since_toot_id = mastodon_api.account_statuses(ma_account_id)[0]["id"]
 except:
@@ -228,6 +230,18 @@ print("Tooting any tweets after tweet " + str(since_tweet_id))
 
 # Set "last URL length update" time to 1970
 last_url_len_update = 0
+
+# Loads tweets/toots associations to be able to mirror threads
+# This links the toots and tweets. For links from Mastodon to
+# Twitter, the toot listed is the last one of the generated thread
+# if the toot is too long to fit into a single tweet.
+status_associations = {'m2t': {}, 't2m': {}}
+try:
+    with open('mtt_status_associations.json', 'r') as f:
+        status_associations['m2t'] = json.load(f, object_hook=lambda d: {int(k): v for k, v in d.items()})
+        status_associations['t2m'] = {tweet_id: toot_id for toot_id, tweet_id in status_associations['m2t'].items()}
+except:
+    pass
 
 while True:
     # Fetch twitter short URL length, if needed
@@ -248,6 +262,7 @@ while True:
 
         print('Found new toots, processing:')
         for toot in new_toots:
+            toot_id = toot["id"]
             content = toot["content"]
             media_attachments = toot["media_attachments"]
 
@@ -301,12 +316,23 @@ while True:
                 if len(current_part.strip()) != 0 or len(content_parts) == 0:
                     content_parts.append(current_part.strip())
             else:
-                print('Toot smaller 140 chars, posting directly...')
+                print('Toot smaller than 140 chars, posting directly...')
                 content_parts.append(content_clean)
 
             # Tweet all the parts. On error, give up and go on with the next toot.
             try:
                 reply_to = None
+
+                # We check if this toot is a reply to a previously sent toot.
+                # If so, the first corresponding tweet will be a reply to
+                # the stored tweet.
+                # Unlike in the Mastodon API calls, we don't have to handle the
+                # case where the tweet was deleted, as twitter will ignore
+                # the in_reply_to_status_id option if the given tweet
+                # does not exists.
+                if toot['in_reply_to_id'] in status_associations['m2t']:
+                    reply_to = status_associations['m2t'][toot['in_reply_to_id']]
+
                 for i in range(len(content_parts)):
                     media_ids = []
                     content_tweet = content_parts[i] + " --"
@@ -346,12 +372,12 @@ while True:
                             # Tweet
                             if len(media_ids) == 0:
                                 print('Tweeting "' + content_tweet + '"...')
-                                reply_to = twitter_api.PostUpdate(content_tweet, in_reply_to_status_id = reply_to).id
+                                reply_to = twitter_api.PostUpdate(content_tweet, in_reply_to_status_id=reply_to).id
                                 since_tweet_id = reply_to
                                 post_success = True
                             else:
                                 print('Tweeting "' + content_tweet + '", with attachments...')
-                                reply_to = twitter_api.PostUpdate(content_tweet, media = media_ids, in_reply_to_status_id = reply_to).id
+                                reply_to = twitter_api.PostUpdate(content_tweet, media=media_ids, in_reply_to_status_id=reply_to).id
                                 since_tweet_id = reply_to
                                 post_success = True
                         except:
@@ -360,6 +386,12 @@ while True:
                                 time.sleep(MASTODON_RETRY_DELAY)
                             else:
                                 raise
+
+                    # Only the last tweet is linked to the toot, see comment
+                    # above the status_associations declaration
+                    if i == len(content_parts) - 1:
+                        status_associations['m2t'][toot_id] = since_tweet_id
+                        status_associations['t2m'][since_tweet_id] = toot_id
             except:
                 print("Encountered error after " + str(MASTODON_RETRIES) + " retries. Not retrying.")
 
@@ -368,13 +400,28 @@ while True:
     # Fetch new tweets
     new_tweets = []
     if POST_ON_MASTODON:
-        new_tweets = twitter_api.GetUserTimeline(since_id = since_tweet_id, include_rts=False, exclude_replies=True)
+        new_tweets = twitter_api.GetUserTimeline(since_id = since_tweet_id, include_rts=False, exclude_replies=False)
     if len(new_tweets) != 0:
         since_tweet_id = new_tweets[0].id
 
         print('Found new tweets, processing:')
         for tweet in new_tweets:
+            tweet_id = tweet.id
             content = tweet.full_text
+            reply_to = None
+
+            if tweet.in_reply_to_user_id:
+                # If it's a reply, we keep the tweet if:
+                # 1. it's a reply from us (in a thread);
+                # 2. it's a reply from a previously transmitted tweet, so we don't sync
+                #    if someone replies to someone in two or more tweets (because in this
+                #    case the 2nd tweet and the ones after are replying to us)
+                if tweet.in_reply_to_user_id != tw_account_id or tweet.in_reply_to_status_id not in status_associations['t2m']:
+                    print('Skipping tweet "' + content + '" - is a reply.')
+                    continue
+
+                reply_to = status_associations['t2m'][tweet.in_reply_to_status_id]
+
             media_attachments = tweet.media
             urls = tweet.urls
             sensitive = tweet.possibly_sensitive
@@ -423,12 +470,20 @@ while True:
                         # Toot
                         if len(media_ids) == 0:
                             print('Tooting "' + content_toot + '"...')
-                            post = mastodon_api.status_post(content_toot, visibility=TOOT_VISIBILITY)
+                            try:
+                                post = mastodon_api.status_post(content_toot, visibility=TOOT_VISIBILITY, in_reply_to_id=reply_to)
+                            except mastodon.Mastodon.MastodonAPIError:
+                                # If the toot we are replying to has been deleted
+                                post = mastodon_api.status_post(content_toot, visibility=TOOT_VISIBILITY)
                             since_toot_id = post["id"]
                             post_success = True
                         else:
                             print('Tooting "' + content_toot + '", with attachments...')
-                            post = mastodon_api.status_post(content_toot, media_ids=media_ids, visibility=TOOT_VISIBILITY, sensitive=None)
+                            try:
+                                post = mastodon_api.status_post(content_toot, media_ids=media_ids, visibility=TOOT_VISIBILITY, sensitive=sensitive, in_reply_to_id=reply_to)
+                            except mastodon.Mastodon.MastodonAPIError:
+                                # If the toot we are replying to has been deleted (same as before)
+                                post = mastodon_api.status_post(content_toot, media_ids=media_ids, visibility=TOOT_VISIBILITY, sensitive=sensitive)
                             since_toot_id = post["id"]
                             post_success = True
                     except:
@@ -437,9 +492,19 @@ while True:
                             time.sleep(TWITTER_RETRY_DELAY)
                         else:
                             raise
+
+                status_associations['t2m'][tweet_id] = since_toot_id
+                status_associations['m2t'][since_toot_id] = tweet_id
             except:
                 print("Encountered error after " + str(TWITTER_RETRIES) + " retries. Not retrying.")
 
         print('Finished tweet processing, resting until next tweets.')
+
+    # We save the status associations in file
+    try:
+        with open('mtt_status_associations.json', 'w') as f:
+            json.dump(status_associations['m2t'], f)
+    except:
+        print('Encountered error while saving status associations file. Threads might be broken after MTT service restart. Check files permissions.')
 
     time.sleep(API_POLL_DELAY)
