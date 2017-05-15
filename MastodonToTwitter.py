@@ -38,6 +38,24 @@ TWITTER_RETRIES = 3
 MASTODON_RETRY_DELAY = 20
 TWITTER_RETRY_DELAY = 20
 
+# The text to prepend to tweets, if the corresponding toot has a
+# content warning. {} is the spoiler text.
+# To disable content warnings from Mastodon to Twitter, set to None.
+TWEET_CW_PREFIX = '[TW ⋅ {}]\n\n'
+
+# The regex to match against tweet to extract a content warning.
+# The CW spoiler text should be in the first capture group.
+# The matching parts of the tweets will be removed and the CW found
+# in the capture group #1 will be displayed as a CW in Mastodon.
+# If multiple CW are found into the tweet, all will be added, separated
+# by the separator below, in the Mastodon CW, and all will be removed from
+# the original tweet. Except if TWEET_CW_ALLOW_MULTI is set to False, then
+# only the first one will be considered.
+# To disable content warnings from Twitter to Mastodon, set to None.
+TWEET_CW_REGEXP = re.compile(r'\[(?:(?:(?:C|T)W)|SPOIL(?:ER)?)(?:[\s\-\.⋅,:–—]+)([^\]]+)\]', re.IGNORECASE)
+TWEET_CW_ALLOW_MULTI = True
+TWEET_CW_SEPARATOR = ', '
+
 # Some helpers copied out from python-twitter, because they're broken there
 URL_REGEXP = re.compile((
     r'('
@@ -284,6 +302,9 @@ while True:
                 print('Skipping toot "' + content_clean + '" - is a reply.')
                 continue
 
+            if TWEET_CW_PREFIX and toot['spoiler_text']:
+                content_clean = TWEET_CW_PREFIX.format(toot['spoiler_text']) + content_clean
+
             # Split toots, if need be, using Many magic numbers.
             content_parts = []
             if calc_expected_status_length(content_clean, short_url_length = url_length) > 140:
@@ -428,6 +449,8 @@ while True:
 
             content_toot = html.unescape(content)
             mentions = re.findall(r'[@]\S*', content_toot)
+            cws = TWEET_CW_REGEXP.findall(content) if TWEET_CW_REGEXP else []
+            warning = None
             media_ids = []
 
             if mentions:
@@ -439,6 +462,10 @@ while True:
                 for url in urls:
                     # Unshorten URLs
                     content_toot = re.sub(url.url, url.expanded_url, content_toot)
+
+            if cws:
+                warning = TWEET_CW_SEPARATOR.join([cw.strip() for cw in cws]) if TWEET_CW_ALLOW_MULTI else cws[0].strip()
+                content_toot = TWEET_CW_REGEXP.sub('', content_toot, count=0 if TWEET_CW_ALLOW_MULTI else 1).strip()
 
             if media_attachments:
                 for attachment in media_attachments:
@@ -471,19 +498,19 @@ while True:
                         if len(media_ids) == 0:
                             print('Tooting "' + content_toot + '"...')
                             try:
-                                post = mastodon_api.status_post(content_toot, visibility=TOOT_VISIBILITY, in_reply_to_id=reply_to)
+                                post = mastodon_api.status_post(content_toot, visibility=TOOT_VISIBILITY, spoiler_text=warning, in_reply_to_id=reply_to)
                             except mastodon.Mastodon.MastodonAPIError:
                                 # If the toot we are replying to has been deleted
-                                post = mastodon_api.status_post(content_toot, visibility=TOOT_VISIBILITY)
+                                post = mastodon_api.status_post(content_toot, visibility=TOOT_VISIBILITY, spoiler_text=warning)
                             since_toot_id = post["id"]
                             post_success = True
                         else:
                             print('Tooting "' + content_toot + '", with attachments...')
                             try:
-                                post = mastodon_api.status_post(content_toot, media_ids=media_ids, visibility=TOOT_VISIBILITY, sensitive=sensitive, in_reply_to_id=reply_to)
+                                post = mastodon_api.status_post(content_toot, media_ids=media_ids, visibility=TOOT_VISIBILITY, sensitive=sensitive, spoiler_text=warning, in_reply_to_id=reply_to)
                             except mastodon.Mastodon.MastodonAPIError:
                                 # If the toot we are replying to has been deleted (same as before)
-                                post = mastodon_api.status_post(content_toot, media_ids=media_ids, visibility=TOOT_VISIBILITY, sensitive=sensitive)
+                                post = mastodon_api.status_post(content_toot, media_ids=media_ids, visibility=TOOT_VISIBILITY, sensitive=sensitive, spoiler_text=warning)
                             since_toot_id = post["id"]
                             post_success = True
                     except:
