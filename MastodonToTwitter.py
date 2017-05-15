@@ -66,6 +66,13 @@ URL_REGEXP = re.compile((
     r'(?:[\w+\/]?[a-z0-9!\*\'\(\);:&=\+\$/%#\[\]\-_\.,~?])*'    # path/query params
 r')').format(r'\b|'.join(twitter.twitter_utils.TLDS)), re.U | re.I | re.X)
 
+try:
+    from mtt_config import *
+    print('Configuration from mtt_config.py loaded.')
+except ImportError:
+    pass
+
+
 def calc_expected_status_length(status, short_url_length = 23):
     replaced_chars = 0
     status_length = len(status)

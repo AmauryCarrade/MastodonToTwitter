@@ -91,3 +91,9 @@ ENV/
 # Make sure nobody owns themselves
 *.secret
 *.json
+
+# Allows to keep the systemd service in the folder and symlink it
+MastodonToTwitter.service
+
+# Allows to separate the config from the main program (easier updates)
+mtt_config.py
