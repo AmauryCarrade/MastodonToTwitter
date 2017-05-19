@@ -23,6 +23,9 @@ import twitter
 POST_ON_MASTODON = True
 POST_ON_TWITTER = True
 
+# Should we slice long messages from Mastodon on Twitter, or cut them
+SPLIT_ON_TWITTER = True
+
 # Manage visibility of your toot. Value are "private", "unlisted" or "public"
 TOOT_VISIBILITY = "unlisted"
 
@@ -260,7 +263,6 @@ while True:
             content_clean = "\n\n".join(re.compile(r'</p><p>', re.IGNORECASE).split(content_clean))
             # Then we can delete the other html contents and unescape the string
             content_clean = html.unescape(str(re.compile(r'<.*?>').sub("", content_clean).strip()))
-
             # Trim out media URLs
             content_clean = re.sub(MEDIA_REGEXP, "", content_clean)
 
@@ -272,34 +274,42 @@ while True:
             # Split toots, if need be, using Many magic numbers.
             content_parts = []
             if calc_expected_status_length(content_clean, short_url_length = url_length) > 140:
-                print('Toot bigger 140 characters, need to split...')
-                current_part = ""
-                for next_word in content_clean.split(" "):
-                    # Need to split here?
-                    if calc_expected_status_length(current_part + " " + next_word, short_url_length = url_length) > 135:
-                        print("new part")
-                        space_left = 135 - calc_expected_status_length(current_part, short_url_length = url_length) - 1
+                    print('Toot bigger 140 characters, need to split...')
+                    current_part = ""
+                    for next_word in content_clean.split(" "):
+                        # Need to split here?
+                        if calc_expected_status_length(current_part + " " + next_word, short_url_length = url_length) > 135:
+                            print("new part")
+                            space_left = 135 - calc_expected_status_length(current_part, short_url_length = url_length) - 1
 
-                        # Want to split word?
-                        if len(next_word) > 30 and space_left > 5 and not twitter.twitter_utils.is_url(next_word):
-                            current_part = current_part + " " + next_word[:space_left]
-                            content_parts.append(current_part)
-                            current_part = next_word[space_left:]
+
+                            if SPLIT_ON_TWITTER:
+                                # Want to split word?
+                                if len(next_word) > 30 and space_left > 5 and not twitter.twitter_utils.is_url(next_word):
+                                    current_part = current_part + " " + next_word[:space_left]
+                                    content_parts.append(current_part)
+                                    current_part = next_word[space_left:]
+                                else:
+                                    content_parts.append(current_part)
+                                    current_part = next_word
+
+                                # Split potential overlong word in current_part
+                                while len(current_part) > 135:
+                                    content_parts.append(current_part[:135])
+                                    current_part = current_part[135:]
+                            else:
+                                print('In fact we just cut')
+                                space_for_suffix = len('… ') + url_length
+                                content_parts.append(current_part[:-space_for_suffix] + '… ' + toot['url'])
+                                current_part = ''
+                                break
                         else:
-                            content_parts.append(current_part)
-                            current_part = next_word
+                            # Just plop next word on
+                            current_part = current_part + " " + next_word
+                    # Insert last part
+                    if len(current_part.strip()) != 0 or len(content_parts) == 0:
+                        content_parts.append(current_part.strip())
 
-                        # Split potential overlong word in current_part
-                        while len(current_part) > 135:
-                            content_parts.append(current_part[:135])
-                            current_part = current_part[135:]
-                    else:
-                        # Just plop next word on
-                        current_part = current_part + " " + next_word
-
-                # Insert last part
-                if len(current_part.strip()) != 0 or len(content_parts) == 0:
-                    content_parts.append(current_part.strip())
             else:
                 print('Toot smaller 140 chars, posting directly...')
                 content_parts.append(content_clean)
@@ -309,7 +319,9 @@ while True:
                 reply_to = None
                 for i in range(len(content_parts)):
                     media_ids = []
-                    content_tweet = content_parts[i] + " --"
+                    content_tweet = content_parts[i]
+                    if SPLIT_ON_TWITTER:
+                        content_tweet += " --"
 
                     # Last content part: Upload media, no -- at the end
                     if i == len(content_parts) - 1:
