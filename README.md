@@ -18,13 +18,13 @@ twitter and Mastodon accounts, so do not share them around.
 
 ## Docker
 
-To run this as a docker app, first run the app once to generate the mtt files, then build the docker container:
+To setup MastodonToTwitter first run the following command and follow instructions
 ```
-docker build -t "mastodontotwitter" .
+docker-compose run --rm mtt
 ```
-Now you can run it:
+Once setup you just need to run the following command in future.
 ```
-docker run -d --name "mastodontotwitter" mastodontotwitter
+docker-compose up -d
 ```
 
 ## Systemd
