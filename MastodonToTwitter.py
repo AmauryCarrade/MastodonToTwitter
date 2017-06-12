@@ -122,7 +122,7 @@ if not os.path.isfile("mtt_twitter.secret") or os.stat("mtt_twitter.secret").st_
             MASTODON_BASE_URL = "https://mastodon.social"
 
         print("\n")
-        if os.path.isfile("mtt_mastodon_server.secret") or os.stat("mtt_mastodon_server.secret").st_size is 0:
+        if os.path.isfile("mtt_mastodon_server.secret") and os.stat("mtt_mastodon_server.secret").st_size is not 0:
             print("You already have Mastodon server set up, so we're skipping that step.")
         else:
             print("Recording Mastodon server...")
@@ -135,7 +135,7 @@ if not os.path.isfile("mtt_twitter.secret") or os.stat("mtt_twitter.secret").st_
                 mastodon_works = False
 
         print("\n")
-        if os.path.isfile("mtt_mastodon_client.secret") or os.stat("mtt_mastodon_client.secret").st_size is 0:
+        if os.path.isfile("mtt_mastodon_client.secret") and os.stat("mtt_mastodon_client.secret").st_size is not 0:
             print("You already have an app set up, so we're skipping that step.")
         else:
             print("App creation should be automatic...")
