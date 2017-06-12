@@ -7,7 +7,6 @@ Mastodon -> Twitter cross-poster
 
 import time
 import re
-import requests
 import html
 import tempfile
 import os
@@ -15,6 +14,7 @@ import mimetypes
 import sys
 import getpass
 from builtins import input
+import requests
 
 from mastodon import Mastodon
 import twitter
@@ -45,10 +45,10 @@ URL_REGEXP = re.compile((
     r'('
     r'(?!(https?://|www\.)?\.|ftps?://|([0-9]+\.){{1,3}}\d+)'  # exclude urls that start with "."
     r'(?:https?://|www\.)*(?!.*@)(?:[\w+-_]+[.])'              # beginning of url
-    r'(?:{0}\b|'                                                # all tlds
-    r'(?:[:0-9]))'                                              # port numbers & close off TLDs
-    r'(?:[\w+\/]?[a-z0-9!\*\'\(\);:&=\+\$/%#\[\]\-_\.,~?])*'    # path/query params
-r')').format(r'\b|'.join(twitter.twitter_utils.TLDS)), re.U | re.I | re.X)
+    r'(?:{0}\b|'                                               # all tlds
+    r'(?:[:0-9]))'                                             # port numbers & close off TLDs
+    r'(?:[\w+\/]?[a-z0-9!\*\'\(\);:&=\+\$/%#\[\]\-_\.,~?])*'   # path/query params
+    r')').format(r'\b|'.join(twitter.twitter_utils.TLDS)), re.U | re.I | re.X)
 
 def calc_expected_status_length(status, short_url_length = 23):
     replaced_chars = 0
@@ -60,7 +60,7 @@ def calc_expected_status_length(status, short_url_length = 23):
     return status_length
 
 # Boot-strap app and user information
-if not os.path.isfile("mtt_twitter.secret"):
+if not os.path.isfile("mtt_twitter.secret") or os.stat("mtt_twitter.secret").st_size is 0:
     print("This appears to be your first time running MastodonToTwitter.")
     print("After some configuration, you'll be up and running in no time.")
     print("First of all, to talk to twitter, you'll need a twitter API key.")
@@ -122,7 +122,7 @@ if not os.path.isfile("mtt_twitter.secret"):
             MASTODON_BASE_URL = "https://mastodon.social"
 
         print("\n")
-        if os.path.isfile("mtt_mastodon_server.secret"):
+        if os.path.isfile("mtt_mastodon_server.secret") or os.stat("mtt_mastodon_server.secret").st_size is 0:
             print("You already have Mastodon server set up, so we're skipping that step.")
         else:
             print("Recording Mastodon server...")
@@ -135,7 +135,7 @@ if not os.path.isfile("mtt_twitter.secret"):
                 mastodon_works = False
 
         print("\n")
-        if os.path.isfile("mtt_mastodon_client.secret"):
+        if os.path.isfile("mtt_mastodon_client.secret") or os.stat("mtt_mastodon_client.secret").st_size is 0:
             print("You already have an app set up, so we're skipping that step.")
         else:
             print("App creation should be automatic...")
