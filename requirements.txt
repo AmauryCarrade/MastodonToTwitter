@@ -1,2 +1,2 @@
-Mastodon.py>=1.0.6
+Mastodon.py>=1.0.6,<=1.0.7
 python-twitter>=3.2
