@@ -1,3 +1,7 @@
+# Warning
+This code is currently very un-maintained. If somebody who preferably actually 
+uses it (I do not) wants to take over, I'd apperciate that  just let me know.
+
 # MastodonToTwitter
 Mastodon <-> Twitter cross-poster.
 
