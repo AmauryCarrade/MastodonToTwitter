@@ -36,6 +36,9 @@ API_POLL_DELAY = 30
 MASTODON_RETRIES = 3
 TWITTER_RETRIES = 3
 
+TWEET_LENGTH = 280
+SAFE_TWEET_LENGTH = TWEET_LENGTH - 5
+
 # How long to wait between retries, in seconds
 MASTODON_RETRY_DELAY = 20
 TWITTER_RETRY_DELAY = 20
@@ -273,14 +276,14 @@ while True:
 
             # Split toots, if need be, using Many magic numbers.
             content_parts = []
-            if calc_expected_status_length(content_clean, short_url_length = url_length) > 140:
-                    print('Toot bigger 140 characters, need to split...')
+            if calc_expected_status_length(content_clean, short_url_length = url_length) > TWEET_LENGTH:
+                    print('Toot bigger {} characters, need to split...'.format(TWEET_LENGTH))
                     current_part = ""
                     for next_word in content_clean.split(" "):
                         # Need to split here?
-                        if calc_expected_status_length(current_part + " " + next_word, short_url_length = url_length) > 135:
+                        if calc_expected_status_length(current_part + " " + next_word, short_url_length = url_length) > SAFE_TWEET_LENGTH:
                             print("new part")
-                            space_left = 135 - calc_expected_status_length(current_part, short_url_length = url_length) - 1
+                            space_left = SAFE_TWEET_LENGTH - calc_expected_status_length(current_part, short_url_length = url_length) - 1
 
 
                             if SPLIT_ON_TWITTER:
@@ -294,9 +297,9 @@ while True:
                                     current_part = next_word
 
                                 # Split potential overlong word in current_part
-                                while len(current_part) > 135:
-                                    content_parts.append(current_part[:135])
-                                    current_part = current_part[135:]
+                                while len(current_part) > SAFE_TWEET_LENGTH:
+                                    content_parts.append(current_part[:SAFE_TWEET_LENGTH])
+                                    current_part = current_part[SAFE_TWEET_LENGTH:]
                             else:
                                 print('In fact we just cut')
                                 space_for_suffix = len('… ') + url_length
@@ -311,7 +314,7 @@ while True:
                         content_parts.append(current_part.strip())
 
             else:
-                print('Toot smaller 140 chars, posting directly...')
+                print('Toot smaller {} chars, posting directly...'.format(TWEET_LENGTH))
                 content_parts.append(content_clean)
 
             # Tweet all the parts. On error, give up and go on with the next toot.
