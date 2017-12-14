@@ -7,7 +7,6 @@ Mastodon -> Twitter cross-poster
 
 import time
 import re
-import requests
 import html
 import tempfile
 import os
@@ -16,6 +15,7 @@ import sys
 import getpass
 import json
 from builtins import input
+import requests
 
 from mastodon import Mastodon
 import twitter
@@ -23,6 +23,9 @@ import twitter
 # Enable repost on services
 POST_ON_MASTODON = True
 POST_ON_TWITTER = True
+
+# Should we slice long messages from Mastodon on Twitter, or cut them
+SPLIT_ON_TWITTER = True
 
 # Manage visibility of your toot. Value are "private", "unlisted" or "public"
 TOOT_VISIBILITY = "unlisted"
@@ -61,10 +64,10 @@ URL_REGEXP = re.compile((
     r'('
     r'(?!(https?://|www\.)?\.|ftps?://|([0-9]+\.){{1,3}}\d+)'  # exclude urls that start with "."
     r'(?:https?://|www\.)*(?!.*@)(?:[\w+-_]+[.])'              # beginning of url
-    r'(?:{0}\b|'                                                # all tlds
-    r'(?:[:0-9]))'                                              # port numbers & close off TLDs
-    r'(?:[\w+\/]?[a-z0-9!\*\'\(\);:&=\+\$/%#\[\]\-_\.,~?])*'    # path/query params
-r')').format(r'\b|'.join(twitter.twitter_utils.TLDS)), re.U | re.I | re.X)
+    r'(?:{0}\b|'                                               # all tlds
+    r'(?:[:0-9]))'                                             # port numbers & close off TLDs
+    r'(?:[\w+\/]?[a-z0-9!\*\'\(\);:&=\+\$/%#\[\]\-_\.,~?])*'   # path/query params
+    r')').format(r'\b|'.join(twitter.twitter_utils.TLDS)), re.U | re.I | re.X)
 
 try:
     from mtt_config import *
@@ -83,7 +86,7 @@ def calc_expected_status_length(status, short_url_length = 23):
     return status_length
 
 # Boot-strap app and user information
-if not os.path.isfile("mtt_twitter.secret"):
+if not os.path.isfile("mtt_twitter.secret") or os.stat("mtt_twitter.secret").st_size is 0:
     print("This appears to be your first time running MastodonToTwitter.")
     print("After some configuration, you'll be up and running in no time.")
     print("First of all, to talk to twitter, you'll need a twitter API key.")
@@ -145,7 +148,7 @@ if not os.path.isfile("mtt_twitter.secret"):
             MASTODON_BASE_URL = "https://mastodon.social"
 
         print("\n")
-        if os.path.isfile("mtt_mastodon_server.secret"):
+        if os.path.isfile("mtt_mastodon_server.secret") and os.stat("mtt_mastodon_server.secret").st_size is not 0:
             print("You already have Mastodon server set up, so we're skipping that step.")
         else:
             print("Recording Mastodon server...")
@@ -158,7 +161,7 @@ if not os.path.isfile("mtt_twitter.secret"):
                 mastodon_works = False
 
         print("\n")
-        if os.path.isfile("mtt_mastodon_client.secret"):
+        if os.path.isfile("mtt_mastodon_client.secret") and os.stat("mtt_mastodon_client.secret").st_size is not 0:
             print("You already have an app set up, so we're skipping that step.")
         else:
             print("App creation should be automatic...")
@@ -300,7 +303,6 @@ while True:
             content_clean = "\n\n".join(re.compile(r'</p><p>', re.IGNORECASE).split(content_clean))
             # Then we can delete the other html contents and unescape the string
             content_clean = html.unescape(str(re.compile(r'<.*?>').sub("", content_clean).strip()))
-
             # Trim out media URLs
             content_clean = re.sub(MEDIA_REGEXP, "", content_clean)
 
@@ -315,34 +317,42 @@ while True:
             # Split toots, if need be, using Many magic numbers.
             content_parts = []
             if calc_expected_status_length(content_clean, short_url_length = url_length) > 140:
-                print('Toot bigger 140 characters, need to split...')
-                current_part = ""
-                for next_word in content_clean.split(" "):
-                    # Need to split here?
-                    if calc_expected_status_length(current_part + " " + next_word, short_url_length = url_length) > 135:
-                        print("new part")
-                        space_left = 135 - calc_expected_status_length(current_part, short_url_length = url_length) - 1
+                    print('Toot bigger 140 characters, need to split...')
+                    current_part = ""
+                    for next_word in content_clean.split(" "):
+                        # Need to split here?
+                        if calc_expected_status_length(current_part + " " + next_word, short_url_length = url_length) > 135:
+                            print("new part")
+                            space_left = 135 - calc_expected_status_length(current_part, short_url_length = url_length) - 1
 
-                        # Want to split word?
-                        if len(next_word) > 30 and space_left > 5 and not twitter.twitter_utils.is_url(next_word):
-                            current_part = current_part + " " + next_word[:space_left]
-                            content_parts.append(current_part)
-                            current_part = next_word[space_left:]
+
+                            if SPLIT_ON_TWITTER:
+                                # Want to split word?
+                                if len(next_word) > 30 and space_left > 5 and not twitter.twitter_utils.is_url(next_word):
+                                    current_part = current_part + " " + next_word[:space_left]
+                                    content_parts.append(current_part)
+                                    current_part = next_word[space_left:]
+                                else:
+                                    content_parts.append(current_part)
+                                    current_part = next_word
+
+                                # Split potential overlong word in current_part
+                                while len(current_part) > 135:
+                                    content_parts.append(current_part[:135])
+                                    current_part = current_part[135:]
+                            else:
+                                print('In fact we just cut')
+                                space_for_suffix = len('… ') + url_length
+                                content_parts.append(current_part[:-space_for_suffix] + '… ' + toot['url'])
+                                current_part = ''
+                                break
                         else:
-                            content_parts.append(current_part)
-                            current_part = next_word
+                            # Just plop next word on
+                            current_part = current_part + " " + next_word
+                    # Insert last part
+                    if len(current_part.strip()) != 0 or len(content_parts) == 0:
+                        content_parts.append(current_part.strip())
 
-                        # Split potential overlong word in current_part
-                        while len(current_part) > 135:
-                            content_parts.append(current_part[:135])
-                            current_part = current_part[135:]
-                    else:
-                        # Just plop next word on
-                        current_part = current_part + " " + next_word
-
-                # Insert last part
-                if len(current_part.strip()) != 0 or len(content_parts) == 0:
-                    content_parts.append(current_part.strip())
             else:
                 print('Toot smaller than 140 chars, posting directly...')
                 content_parts.append(content_clean)
@@ -363,7 +373,9 @@ while True:
 
                 for i in range(len(content_parts)):
                     media_ids = []
-                    content_tweet = content_parts[i] + " --"
+                    content_tweet = content_parts[i]
+                    if SPLIT_ON_TWITTER:
+                        content_tweet += " --"
 
                     # Last content part: Upload media, no -- at the end
                     if i == len(content_parts) - 1:

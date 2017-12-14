@@ -1,3 +1,7 @@
+# Warning
+This code is currently very un-maintained. If somebody who preferably actually 
+uses it (I do not) wants to take over, I'd apperciate that  just let me know.
+
 # MastodonToTwitter
 Mastodon <-> Twitter cross-poster.
 
@@ -31,17 +35,18 @@ file and copy the configuration variables you want to change
 there (best option if you want to be able to update this using
 `git pull` and don't want to alter the core files).
 
+
 ## Docker
 
-To run this as a docker app, first run the app once to generate
-the mtt files, then build the docker container:
+To setup MastodonToTwitter first run the following command and follow instructions:
 ```
-docker build -t "mastodontotwitter" .
+docker-compose run --rm mtt
 ```
-Now you can run it:
+Once setup you just need to run the following command in future.
 ```
-docker run -d --name "mastodontotwitter" mastodontotwitter
+docker-compose up -d
 ```
+
 
 ## Systemd
 
@@ -49,7 +54,10 @@ The `MastodonToTwitter.service.sample` file is a systemd service.
 You can copy it to `MastodonToTwitter.service`, edit it to change the
 install path, symlink it to `/etc/systemd/system/`, and then use
 `systemctl start|stop|restart|status MastodonToTwitter` and
-`journalctl -u MastodonToTwitter.service` to run this as a simple service
+`journalctl -u MastodonToTwitter.service` to run this as a simple service.
+
+The `MastodonToTwitter.service` file is in the `gitignore` file, so you will not have a problem when updating.
+
 
 ## Heroku
 
@@ -70,4 +78,4 @@ Commit and push your changes to heroku master.
 Open a bash shell on heroku with `heroku run bash` and follow the basic usage
 instructions to generate your tokens.
 
-Exit bash and scale your heroku instance ` heroku ps:scale worker=1` to get things going.
+Exit bash and scale your heroku instance `heroku ps:scale worker=1` to get things going.
