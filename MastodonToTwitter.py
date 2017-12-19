@@ -28,7 +28,7 @@ POST_ON_TWITTER = True
 SPLIT_ON_TWITTER = True
 
 # Manage visibility of your toot. Value are "private", "unlisted" or "public"
-TOOT_VISIBILITY = "unlisted"
+TOOT_VISIBILITY = "private"
 
 # How long to wait between polls to the APIs, in seconds
 API_POLL_DELAY = 30
@@ -243,18 +243,24 @@ twitter_api = twitter.Api(
     consumer_secret = TWITTER_CONSUMER_SECRET,
     access_token_key = TWITTER_ACCESS_KEY,
     access_token_secret = TWITTER_ACCESS_SECRET,
-    tweet_mode = 'extended' # Allow tweets longer than 140 raw characters
+    tweet_mode = 'extended' # Allow tweets longer than 140/280 raw characters
 )
 
 ma_account_id = mastodon_api.account_verify_credentials()["id"]
 tw_account_id = twitter_api.VerifyCredentials().id
 try:
     since_toot_id = mastodon_api.account_statuses(ma_account_id)[0]["id"]
-except:
+    print("Tweeting any toot after toot " + str(since_toot_id))
+except IndexError:
     since_toot_id = 0
-print("Tweeting any toots after toot " + str(since_toot_id))
-since_tweet_id = twitter_api.GetUserTimeline()[0].id
-print("Tooting any tweets after tweet " + str(since_tweet_id))
+    print("Tweeting any toot (user timeline is empty right now)")
+
+try:
+    since_tweet_id = twitter_api.GetUserTimeline()[0].id
+    print("Tooting any tweet after tweet " + str(since_tweet_id))
+except IndexError:
+    since_tweet_id = 0
+    print("Tooting any tweet (user timeline is empty right now)")
 
 # Set "last URL length update" time to 1970
 last_url_len_update = 0
@@ -277,7 +283,7 @@ while True:
         twitter_api._config = None
         url_length = max(twitter_api.GetShortUrlLength(False), twitter_api.GetShortUrlLength(True)) + 1
         last_url_len_update = time.time()
-        print("Updated expected short URL length: Is now " + str(url_length))
+        print("Updated expected short URL length - is now " + str(url_length))
 
     # Fetch new toots
     new_toots = []
