@@ -10,7 +10,7 @@ import twitter
 from datetime import datetime
 from threading import Thread
 
-from mtt import config
+from mtt import config, lock
 
 
 class MTTThread(Thread):
@@ -28,6 +28,22 @@ class MTTThread(Thread):
         self.tw_account_id = tw_account_id
         self.status_associations = status_associations
         self.sent_status = sent_status
+
+    def mark_toot_sent(self, toot_id):
+        with lock:
+            self.sent_status['toots'].append(str(toot_id))
+
+    def mark_tweet_sent(self, tweet_id):
+        with lock:
+            self.sent_status['tweets'].append(str(tweet_id))
+
+    def is_toot_sent_by_us(self, toot_id):
+        with lock:
+            return str(toot_id) in self.sent_status['toots']
+
+    def is_tweet_sent_by_us(self, tweet_id):
+        with lock:
+            return str(tweet_id) in self.sent_status['tweets']
 
     def associate_status(self, toot_id, tweet_id):
         """

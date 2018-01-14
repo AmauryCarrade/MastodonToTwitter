@@ -61,9 +61,8 @@ class TwitterPublisher(MTTThread):
             def on_update(self, toot):
                 toot_id = toot["id"]
 
-                with lock:
-                    if toot_id in self.publisher.sent_status['toots']:
-                        return
+                if self.publisher.is_toot_sent_by_us(toot_id):
+                    return
 
                 content = toot["content"]
                 media_attachments = toot["media_attachments"]
@@ -139,16 +138,22 @@ class TwitterPublisher(MTTThread):
                                         content_tweet,
                                         in_reply_to_status_id=reply_to
                                     ).id
+
+                                    self.publisher.mark_tweet_sent(reply_to)
                                     since_tweet_id = reply_to
                                     post_success = True
+
                                 else:
                                     reply_to = self.publisher.twitter_api.PostUpdate(
                                         content_tweet,
                                         media=media_ids,
                                         in_reply_to_status_id=reply_to
                                     ).id
+
+                                    self.publisher.mark_tweet_sent(reply_to)
                                     since_tweet_id = reply_to
                                     post_success = True
+
                             except:
                                 if retry_counter < config.MASTODON_RETRIES:
                                     retry_counter += 1
@@ -156,9 +161,7 @@ class TwitterPublisher(MTTThread):
                                 else:
                                     raise
 
-                        with lock:
-                            lgt('Tweet sent successfully.')
-                            self.publisher.sent_status['tweets'].append(reply_to)
+                        lgt('Tweet sent successfully.')
 
                         # Only the last tweet is linked to the toot, see comment
                         # above the status_associations declaration
@@ -166,6 +169,7 @@ class TwitterPublisher(MTTThread):
                             with lock:
                                 self.publisher.associate_status(toot_id, since_tweet_id)
                                 self.publisher.save_status_associations()
+
                 except Exception as e:
                     lgt("Encountered error after " + str(config.MASTODON_RETRIES) + " retries. Not retrying.")
                     raise e

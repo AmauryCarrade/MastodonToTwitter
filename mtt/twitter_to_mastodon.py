@@ -37,6 +37,20 @@ class MastodonPublisher(MTTThread):
         except IndexError:
             lgt('Tooting any tweet (user timeline is empty right now)')
 
+    @staticmethod
+    def _get_tweet_full_text(tweet):
+        if 'extended_tweet' in tweet:
+            if 'full_text' in tweet['extended_tweet']:
+                return tweet['extended_tweet']['full_text']
+            elif 'text' in tweet['extended_tweet']:
+                return tweet['extended_tweet']['text']
+        elif 'full_text' in tweet:
+            return tweet['full_text']
+        elif 'text' in tweet:
+            return tweet['text']
+        else:
+            return ''
+
     def run(self):
         self.init_process()
 
@@ -47,11 +61,25 @@ class MastodonPublisher(MTTThread):
                 continue
 
             tweet_id = tweet['id']
-            with lock:
-                if tweet_id in self.sent_status['tweets']:
-                    continue
 
-            content = tweet['full_text'] if 'full_text' in tweet else tweet['text']
+            if self.is_tweet_sent_by_us(tweet_id):
+                continue
+
+            is_retweet = False
+
+            content = MastodonPublisher._get_tweet_full_text(tweet)
+
+            if 'retweeted_status' in tweet:
+                rt = tweet['retweeted_status']
+                rt_content = MastodonPublisher._get_tweet_full_text(rt)
+
+                content = f'\U0001f501 RT @{rt["user"]["screen_name"]}\n\n' \
+                          f'{rt_content}\n\n' \
+                          f'https://twitter.com/{rt["user"]["screen_name"]}/status/{rt["id_str"]}'
+
+                tweet = rt
+                is_retweet = True
+
             reply_to = None
 
             with lock:
@@ -60,26 +88,43 @@ class MastodonPublisher(MTTThread):
                     # 1. it's a reply from us (in a thread);
                     # 2. it's a reply from a previously transmitted tweet, so we don't sync
                     #    if someone replies to someone in two or more tweets (because in this
-                    #    case the 2nd tweet and the ones after are replying to us)
-                    if (tweet['in_reply_to_user_id'] != self.tw_account_id
-                       or tweet['in_reply_to_status_id'] not in self.status_associations['t2m']):
+                    #    case the 2nd tweet and the ones after are replying to us);
+                    # 3. it's a reply from another one but we retweeted it.
+
+                    # If it's not a tweet in reply to us
+                    if ((tweet['in_reply_to_user_id'] != self.tw_account_id
+                         # or if it's a reply to us but not in our threads association
+                         or tweet['in_reply_to_status_id'] not in self.status_associations['t2m'])
+                        # or if it's a tweet from us but not a retweet
+                       and not is_retweet):
+
+                        # ... in all these cases, we don't want to transfer the tweet.
                         lgt(f'Skipping tweet {tweet_id} - it\'s a reply.')
                         continue
 
-                    reply_to = self.status_associations['t2m'][tweet['in_reply_to_status_id']]
+                    # A tweet can be a reply without previous tweet if we directly mentioned someone
+                    # (starting the tweet with the mention).
+                    if tweet['in_reply_to_status_id'] is not None:
+                        reply_to = self.status_associations['t2m'].get(tweet['in_reply_to_status_id'])
 
             media_attachments = (tweet['media'] if 'media' in tweet
                                  else tweet['entities']['media'] if 'entities' in tweet and 'media' in tweet['entities']
+                                 else tweet['extended_tweet']['entities']['media']
+                                     if 'extended_tweet' in tweet and 'entities' in tweet['extended_tweet']
+                                     and 'media' in tweet['extended_tweet']['entities']
                                  else [])
 
             urls = (tweet['urls'] if 'urls' in tweet
                     else tweet['entities']['urls'] if 'entities' in tweet and 'urls' in tweet['entities']
+                    else tweet['extended_tweet']['entities']['urls']
+                        if 'extended_tweet' in tweet and 'entities' in tweet['extended_tweet']
+                        and 'urls' in tweet['extended_tweet']['entities']
                     else [])
 
             sensitive = tweet['possibly_sensitive'] if 'possibly_sensitive' in tweet else False
 
             content_toot = html.unescape(content)
-            mentions = re.findall(r'[@]\S*', content_toot)
+            mentions = re.findall(r'@[a-zA-Z0-9_]*', content_toot)
             cws = config.TWEET_CW_REGEXP.findall(content) if config.TWEET_CW_REGEXP else []
             warning = None
             media_ids = []
@@ -92,7 +137,7 @@ class MastodonPublisher(MTTThread):
             if urls:
                 for url in urls:
                     # Un-shorten URLs
-                    content_toot = re.sub(url.url, url.expanded_url, content_toot)
+                    content_toot = re.sub(url['url'], url['expanded_url'], content_toot)
 
             if cws:
                 warning = config.TWEET_CW_SEPARATOR.join([cw.strip() for cw in cws]) if config.TWEET_CW_ALLOW_MULTI else cws[0].strip()
@@ -128,6 +173,8 @@ class MastodonPublisher(MTTThread):
                                     spoiler_text=warning,
                                     in_reply_to_id=reply_to
                                 )
+                                self.mark_toot_sent(post['id'])
+
                             except MastodonAPIError:
                                 # If the toot we are replying to has been deleted while we were processing it
                                 post = self.mastodon_api.status_post(
@@ -135,7 +182,9 @@ class MastodonPublisher(MTTThread):
                                     visibility=config.TOOT_VISIBILITY,
                                     spoiler_text=warning
                                 )
-                            since_toot_id = post["id"]
+                                self.mark_toot_sent(post['id'])
+
+                            since_toot_id = post['id']
                             post_success = True
 
                         else:
@@ -148,6 +197,8 @@ class MastodonPublisher(MTTThread):
                                     spoiler_text=warning,
                                     in_reply_to_id=reply_to
                                 )
+                                self.mark_toot_sent(post['id'])
+
                             except MastodonAPIError:
                                 # If the toot we are replying to has been deleted (same as before)
                                 post = self.mastodon_api.status_post(
@@ -157,6 +208,8 @@ class MastodonPublisher(MTTThread):
                                     sensitive=sensitive,
                                     spoiler_text=warning
                                 )
+                                self.mark_toot_sent(post['id'])
+
                             since_toot_id = post['id']
                             post_success = True
 
@@ -174,8 +227,6 @@ class MastodonPublisher(MTTThread):
                 with lock:
                     self.associate_status(since_toot_id, tweet_id)
                     self.save_status_associations()
-
-                    self.sent_status['toots'].append(since_toot_id)
 
             except MastodonError:
                 lgt(f'Encountered error after {config.TWITTER_RETRIES} retries. Not retrying.')
