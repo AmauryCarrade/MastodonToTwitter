@@ -177,4 +177,8 @@ class TwitterPublisher(MTTThread):
                 # From times to times we update the Twitter URL length.
                 self.publisher.update_twitter_link_length()
 
-        self.mastodon_api.user_stream(TootsListener(self), async=False)
+        # Compatibility with multiple versions of Mastodon.py
+        try:
+            self.mastodon_api.stream_user(TootsListener(self), async=False)
+        except AttributeError:
+            self.mastodon_api.user_stream(TootsListener(self), async=False)
