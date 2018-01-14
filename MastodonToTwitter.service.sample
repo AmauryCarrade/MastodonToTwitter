@@ -1,5 +1,5 @@
 [Unit]
-Description=crossposter mastodon <-> twitter
+Description=Mastodon <-> Twitter crossposter
 After=network.target
 
 [Service]
@@ -7,7 +7,7 @@ Type=simple
 User={USER NAME HERE}
 Environment=LC_ALL=en_US.UTF-8
 WorkingDirectory={INSTALLATION PATH HERE}
-ExecStart=/usr/bin/python3 {INSTALLATION PATH HERE}/MastodonToTwitter.py
+ExecStart=/usr/bin/python3 -m mtt
 TimeoutSec=15
 Restart=always
 

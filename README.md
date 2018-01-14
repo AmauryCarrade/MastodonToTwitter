@@ -1,20 +1,25 @@
-# Warning
-This code is currently very un-maintained. If somebody who preferably actually 
-uses it (I do not) wants to take over, I'd apperciate that  just let me know.
-
 # MastodonToTwitter
-Mastodon <-> Twitter cross-poster.
+___Mastodon ⬄ Twitter real-time cross-poster, using streaming APIs.___
 
-Requirements: Python 3.4 minimum, with two packages, python-twitter
+
+
+Requirements: Python 3.6 minimum, with two packages, python-twitter
 version 3.2 upwards and Mastodon.py version 1.0.2 upwards:
 
     # Python 3
     pip3 install -r requirements.txt
 
-For basic usage, just run the MastodonToTwitter.py script and
-follow the on-screen prompts. To change the polling interval
-or the instance of Mastodon the script talks to, edit the
-settings in the script.
+You can also use a virtual environment, if you don't use a container,
+but take care to adapt the paths to the Python binary in the SystemD
+service.
+
+For basic usage, execute from the project directory
+
+```bash
+python -m mtt
+```
+
+and follow the on-screen prompts.
 
 The script stores your credentials in a bunch of files ending
 on .secret. The contents of these files let people access your
@@ -28,9 +33,8 @@ replies to old theads on the Twitter side will not be posted on
 Mastodon at all.
 
 To customize options, you can either modify directly the
-`MastodonToTwitter.py` file, the configuration option being
-at the top of the script (best option if you want to tweak
-a few things and forget this), or create a `mtt_config.py`
+`mtt/config.py` file (best option if you want to tweak
+a few things and forget this), or create a `mtt/user_config.py`
 file and copy the configuration variables you want to change
 there (best option if you want to be able to update this using
 `git pull` and don't want to alter the core files).
@@ -71,7 +75,7 @@ python-3.6.1
 ```
 Create a `Procfile` which contains
 ```
-worker: python3 MastodonToTwitter.py
+worker: python3 -m mtt
 ```
 Commit and push your changes to heroku master.
 

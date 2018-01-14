@@ -88,6 +88,48 @@ ENV/
 # Rope project settings
 .ropeproject
 
+
+# Directory-based IntelliJ/PyCharm project format
+.idea
+
+# File-based IntelliJ/PyCharm project format:
+*.iws
+
+# CMake
+cmake-build-debug/
+
+
+## Plugin-specific files:
+
+# IntelliJ
+/out/
+
+# mpeltonen/sbt-idea plugin
+.idea_modules/
+
+# JIRA plugin
+atlassian-ide-plugin.xml
+
+# Ruby plugin and RubyMine
+/.rakeTasks
+
+# Crashlytics plugin (for Android Studio and IntelliJ)
+com_crashlytics_export_strings.xml
+crashlytics.properties
+crashlytics-build.properties
+fabric.properties
+
+### PyCharm Patch ###
+# Comment Reason: https://github.com/joeblau/gitignore.io/issues/186#issuecomment-215987721
+
+# *.iml
+# modules.xml
+# .idea/misc.xml
+# *.ipr
+
+# Sonarlint plugin
+.idea/sonarlint
+
 # Make sure nobody owns themselves
 *.secret
 *.json
@@ -96,4 +138,4 @@ ENV/
 MastodonToTwitter.service
 
 # Allows to separate the config from the main program (easier updates)
-mtt_config.py
+mtt/user_config.py

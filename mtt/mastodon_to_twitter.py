@@ -1,0 +1,176 @@
+import html
+import mimetypes
+import os
+import re
+import requests
+import tempfile
+import time
+
+from mastodon import StreamListener
+
+from mtt import config, lock
+from mtt.utils import MTTThread, lg, lgt, split_status
+
+
+class TwitterPublisher(MTTThread):
+    def __init__(self, mastodon_api, twitter_api, ma_account_id, tw_account_id,
+                 status_associations, sent_status, group=None, target=None, name=None):
+        super(TwitterPublisher, self).__init__(
+            group=group,
+            target=target, 
+            name=name,
+            mastodon_api=mastodon_api,
+            twitter_api=twitter_api,
+            ma_account_id=ma_account_id,
+            tw_account_id=tw_account_id,
+            status_associations=status_associations,
+            sent_status=sent_status
+        )
+
+        self.since_toot_id = 0
+        self.url_length = 24
+        self.last_url_len_update = 0
+
+        self.MEDIA_REGEXP = re.compile(re.escape(self.mastodon_api.api_base_url.rstrip("/")) + "\/media\/(\w)+(\s|$)+")
+
+    def init_process(self):
+        try:
+            self.since_toot_id = self.mastodon_api.account_statuses(self.ma_account_id)[0]["id"]
+            lgt(f'Tweeting any toot after toot {self.since_toot_id}')
+        except IndexError:
+            lgt('Tweeting any toot (user timeline is empty right now)')
+
+        self.update_twitter_link_length()
+
+    def update_twitter_link_length(self):
+        if time.time() - self.last_url_len_update > 60 * 60 * 24:
+            self.twitter_api._config = None
+            self.url_length = max(self.twitter_api.GetShortUrlLength(False), self.twitter_api.GetShortUrlLength(True)) + 1
+            self.last_url_len_update = time.time()
+            lgt(f'Updated expected short URL length - it is now {self.url_length} characters.')
+
+    def run(self):
+        self.init_process()
+
+        lgt('Listening for toots…')
+
+        class TootsListener(StreamListener):
+            def __init__(self, publisher):
+                self.publisher = publisher
+
+            def on_update(self, toot):
+                toot_id = toot["id"]
+
+                with lock:
+                    if toot_id in self.publisher.sent_status['toots']:
+                        return
+
+                content = toot["content"]
+                media_attachments = toot["media_attachments"]
+
+                # We trust mastodon to return valid HTML
+                content_clean = re.sub(r'<a [^>]*href="([^"]+)">[^<]*</a>', '\g<1>', content)
+
+                # We replace html br with new lines
+                content_clean = "\n".join(re.compile(r'<br ?/?>', re.IGNORECASE).split(content_clean))
+                # We must also replace new paragraphs with double line skips
+                content_clean = "\n\n".join(re.compile(r'</p><p>', re.IGNORECASE).split(content_clean))
+                # Then we can delete the other html contents and unescape the string
+                content_clean = html.unescape(str(re.compile(r'<.*?>').sub("", content_clean).strip()))
+                # Trim out media URLs
+                content_clean = re.sub(self.publisher.MEDIA_REGEXP, "", content_clean)
+
+                # Don't cross-post replies
+                if len(content_clean) != 0 and content_clean[0] == '@':
+                    print('Skipping toot "' + content_clean + '" - is a reply.')
+                    return
+
+                if config.TWEET_CW_PREFIX and toot['spoiler_text']:
+                    content_clean = config.TWEET_CW_PREFIX.format(toot['spoiler_text']) + content_clean
+
+                content_parts = split_status(
+                    status=content_clean,
+                    max_length=280,
+                    split=config.SPLIT_ON_TWITTER,
+                    url=toot['uri']
+                )
+
+                # Tweet all the parts. On error, give up and go on with the next toot.
+                try:
+                    reply_to = None
+
+                    # We check if this toot is a reply to a previously sent toot.
+                    # If so, the first corresponding tweet will be a reply to
+                    # the stored tweet.
+                    # Unlike in the Mastodon API calls, we don't have to handle the
+                    # case where the tweet was deleted, as twitter will ignore
+                    # the in_reply_to_status_id option if the given tweet
+                    # does not exists.
+                    if toot['in_reply_to_id'] in self.publisher.status_associations['m2t']:
+                        reply_to = self.publisher.status_associations['m2t'][toot['in_reply_to_id']]
+
+                    for i in range(len(content_parts)):
+                        media_ids = []
+                        content_tweet = content_parts[i]
+
+                        # Last content part: Upload media, no -- at the end
+                        if i == len(content_parts) - 1:
+                            for attachment in media_attachments:
+                                media_ids.append(self.publisher.transfer_media(
+                                    media_url=attachment["url"],
+                                    to='twitter'
+                                ))
+
+                            content_tweet = content_parts[i]
+
+                        # Some final cleaning
+                        content_tweet = content_tweet.strip()
+
+                        # Retry three times before giving up
+                        retry_counter = 0
+                        post_success = False
+
+                        lgt(f'Sending tweet "{content_tweet}"…')
+
+                        while not post_success:
+                            try:
+                                if len(media_ids) == 0:
+                                    reply_to = self.publisher.twitter_api.PostUpdate(
+                                        content_tweet,
+                                        in_reply_to_status_id=reply_to
+                                    ).id
+                                    since_tweet_id = reply_to
+                                    post_success = True
+                                else:
+                                    reply_to = self.publisher.twitter_api.PostUpdate(
+                                        content_tweet,
+                                        media=media_ids,
+                                        in_reply_to_status_id=reply_to
+                                    ).id
+                                    since_tweet_id = reply_to
+                                    post_success = True
+                            except:
+                                if retry_counter < config.MASTODON_RETRIES:
+                                    retry_counter += 1
+                                    time.sleep(config.MASTODON_RETRY_DELAY)
+                                else:
+                                    raise
+
+                        with lock:
+                            lgt('Tweet sent successfully.')
+                            self.publisher.sent_status['tweets'].append(reply_to)
+
+                        # Only the last tweet is linked to the toot, see comment
+                        # above the status_associations declaration
+                        if i == len(content_parts) - 1:
+                            with lock:
+                                self.publisher.associate_status(toot_id, since_tweet_id)
+                                self.publisher.save_status_associations()
+                except Exception as e:
+                    lgt("Encountered error after " + str(config.MASTODON_RETRIES) + " retries. Not retrying.")
+                    raise e
+
+                # From times to times we update the Twitter URL length.
+                self.publisher.update_twitter_link_length()
+
+        self.mastodon_api.user_stream(TootsListener(self), async=False)
