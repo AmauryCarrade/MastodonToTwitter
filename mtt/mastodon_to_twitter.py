@@ -1,15 +1,12 @@
 import html
-import mimetypes
-import os
 import re
-import requests
-import tempfile
 import time
 
 from mastodon import StreamListener
+from urllib.parse import urlparse
 
 from mtt import config, lock
-from mtt.utils import MTTThread, lg, lgt, split_status
+from mtt.utils import MTTThread, lgt, split_status
 
 
 class TwitterPublisher(MTTThread):
@@ -26,6 +23,8 @@ class TwitterPublisher(MTTThread):
             status_associations=status_associations,
             sent_status=sent_status
         )
+
+        self.account = mastodon_api.account(ma_account_id)
 
         self.since_toot_id = 0
         self.url_length = 24
@@ -49,6 +48,30 @@ class TwitterPublisher(MTTThread):
             self.last_url_len_update = time.time()
             lgt(f'Updated expected short URL length - it is now {self.url_length} characters.')
 
+    @staticmethod
+    def _are_same_accounts(first, other):
+        """
+        Checks if the two accounts are the same, i.e.
+        - with the same ID;
+        - from the same instance.
+        :param first: An account (dict-like with at least an 'id' and an 'url' key).
+        :param other: Another account (same).
+        :return: True if both are the same.
+        """
+        if first['id'] != other['id']:
+            return False
+
+        # In case the ID is the same we check the instance
+        # (we don't want to check only the profile URL as
+        # it would break the sync if the username is changed)
+        if '@' in first['url'] and '@' in other['url']:
+            return first['url'].split('@')[0] == other['url'].split('@')[0]
+        else:
+            return first['url'] == other['url']
+
+    def is_from_us(self, account):
+        return self._are_same_accounts(self.account, account)
+
     def run(self):
         self.init_process()
 
@@ -59,6 +82,17 @@ class TwitterPublisher(MTTThread):
                 self.publisher = publisher
 
             def on_update(self, toot):
+                # We only transfer our own toots, but the streaming endpoint receives the whole
+                # timeline.
+                if not self.publisher.is_from_us(toot['account']):
+                    return
+
+                # Avoids a race condition.
+                # We wait a little bit so tweets sent to Mastodon
+                # can be marked as such before this run, avoiding
+                # bouncing tweets/toots.
+                time.sleep(config.STATUS_PROCESS_DELAY)
+
                 toot_id = toot["id"]
 
                 if self.publisher.is_toot_sent_by_us(toot_id):
@@ -66,6 +100,16 @@ class TwitterPublisher(MTTThread):
 
                 content = toot["content"]
                 media_attachments = toot["media_attachments"]
+
+                if toot['reblogged'] and 'reblog' in toot:
+                    reblog = toot['reblog']
+                    reblog_name = f'@{reblog["account"]["username"]}@{urlparse(reblog["account"]["url"]).netloc}'
+                    content = f'\U0001f501 RT {reblog_name}\n' \
+                              f'{reblog["content"]}\n\n' \
+                              f'{reblog["url"]}'
+                    media_attachments = reblog["media_attachments"]
+
+                    toot = reblog
 
                 # We trust mastodon to return valid HTML
                 content_clean = re.sub(r'<a [^>]*href="([^"]+)">[^<]*</a>', '\g<1>', content)

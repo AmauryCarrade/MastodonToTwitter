@@ -70,3 +70,10 @@ FILES = {
     'credentials_mastodon_user': ROOT_PATH / 'mtt_mastodon_user.secret',
     'status_associations': ROOT_PATH / 'mtt_status_associations.json'
 }
+
+# The delay to wait before a tweet or a toot is processed (seconds).
+# This avoids race conditions.
+# We wait a little bit so tweets sent to Mastodon (or the other way
+# around) can be marked as such before this run, avoiding bouncing
+# tweets/toots
+STATUS_PROCESS_DELAY = 0.6

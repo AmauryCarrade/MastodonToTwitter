@@ -1,16 +1,11 @@
 import html
-import mastodon
-import mimetypes
-import os
 import re
-import requests
-import tempfile
 import time
 
 from mastodon.Mastodon import MastodonError, MastodonAPIError
 
 from mtt import config, lock
-from mtt.utils import MTTThread, lg, lgt
+from mtt.utils import MTTThread, lgt
 
 
 class MastodonPublisher(MTTThread):
@@ -59,6 +54,12 @@ class MastodonPublisher(MTTThread):
         for tweet in self.twitter_api.GetUserStream():
             if 'text' not in tweet and 'full_text' not in tweet:
                 continue
+
+            # Avoids a race condition.
+            # We wait a little bit so toots sent to Twitter
+            # can be marked as such before this run, avoiding
+            # bouncing tweets/toots.
+            time.sleep(config.STATUS_PROCESS_DELAY)
 
             tweet_id = tweet['id']
 

@@ -56,22 +56,6 @@ twitter_api = twitter.Api(
 ma_account_id = mastodon_api.account_verify_credentials()["id"]
 tw_account_id = twitter_api.VerifyCredentials().id
 
-'''
-try:
-    since_toot_id = mastodon_api.account_statuses(ma_account_id)[0]["id"]
-    print("Tweeting any toot after toot " + str(since_toot_id))
-except IndexError:
-    since_toot_id = 0
-    print("Tweeting any toot (user timeline is empty right now)")
-
-try:
-    since_tweet_id = twitter_api.GetUserTimeline()[0].id
-    print("Tooting any tweet after tweet " + str(since_tweet_id))
-except IndexError:
-    since_tweet_id = 0
-    print("Tooting any tweet (user timeline is empty right now)")
-'''
-
 #
 # Tweets / toots association
 #
@@ -85,7 +69,7 @@ try:
     with open('mtt_status_associations.json', 'r') as f:
         status_associations['m2t'] = json.load(f, object_hook=lambda d: {int(k): v for k, v in d.items()})
         status_associations['t2m'] = {tweet_id: toot_id for toot_id, tweet_id in status_associations['m2t'].items()}
-except:
+except IOError:
     pass
 
 
@@ -95,8 +79,8 @@ except:
 
 # To avoid bouncing toots or tweets, we keep the ID of the status we sent to
 # avoid re-sending them indefinitely.
-# Unlike status_associations, this contains _every_ status sent including intermediate tweets
-# if toots are too long.
+# Unlike status_associations, this contains _every_ status sent including
+# intermediate tweets if toots are too long.
 sent_status = {'toots': [], 'tweets': []}
 
 
