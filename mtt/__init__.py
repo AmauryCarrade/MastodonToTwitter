@@ -3,7 +3,7 @@ import os
 from threading import RLock
 from path import Path
 
-import mtt.config as base_config
+import mtt.config as base_config  # noqa
 
 __all__ = ['config', 'lock']
 
@@ -45,7 +45,7 @@ def get_variables_in_module(module_name: str) -> ConfigAccessor:
 config = get_variables_in_module('base_config')
 
 try:
-    import mtt.user_config as user_config
+    import mtt.user_config as user_config  # noqa
     config.update(get_variables_in_module('user_config'))
 except ImportError:
     pass

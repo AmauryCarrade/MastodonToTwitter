@@ -1,18 +1,19 @@
 import getpass
-import sys
 import twitter
 
 from builtins import input
 from mastodon import Mastodon
 from mastodon.Mastodon import MastodonError
+from path import Path
+from twitter import TwitterError
 
 from mtt import config
 
 
 def check_credentials():
-    '''
+    """
     Checks if the credentials are available for use.
-    '''
+    """
     for key, file in config.FILES.items():
         if not key.startswith('credentials_'):
             continue
@@ -62,8 +63,8 @@ def setup_credentials():
 
             verification = twitter_api.VerifyCredentials()
             if verification is None:
-                raise RuntimeError
-        except:
+                raise TwitterError
+        except TwitterError:
             twitter_works = False
 
         if not twitter_works:
@@ -87,26 +88,32 @@ def setup_credentials():
             MASTODON_BASE_URL = "https://mastodon.social"
 
         print("\n")
-        if config.FILES['credentials_mastodon_server'].exists() and config.FILES['credentials_mastodon_server'].size > 0:
+
+        credentials_mastodon_server: Path = config.FILES['credentials_mastodon_server']
+        credentials_mastodon_client: Path = config.FILES['credentials_mastodon_client']
+        credentials_mastodon_user: Path = config.FILES['credentials_mastodon_user']
+
+        if credentials_mastodon_server.exists() and credentials_mastodon_server.size > 0:
             print("You already have Mastodon server set up, so we're skipping that step.")
         else:
             print("Recording Mastodon server...")
             try:
-                config.FILES['credentials_mastodon_server'].write_text(MASTODON_BASE_URL)
+                credentials_mastodon_server.write_text(MASTODON_BASE_URL)
             except OSError as e:
                 print("... but it failed.", e)
                 mastodon_works = False
                 continue
 
         print("\n")
-        if config.FILES['credentials_mastodon_client'].exists() and config.FILES['credentials_mastodon_client'].size > 0:
+
+        if credentials_mastodon_client.exists() and credentials_mastodon_client.size > 0:
             print("You already have an app set up, so we're skipping that step.")
         else:
             print("App creation should be automatic...")
             try:
                 Mastodon.create_app(
                     "MastodonToTwitter",
-                    to_file=config.FILES['credentials_mastodon_client'],
+                    to_file=credentials_mastodon_client,
                     scopes=["read", "write"],
                     api_base_url=MASTODON_BASE_URL
                 )
@@ -122,13 +129,13 @@ def setup_credentials():
         try:
             mastodon_works = True
             mastodon_api = Mastodon(
-                client_id=config.FILES['credentials_mastodon_client'],
+                client_id=credentials_mastodon_client,
                 api_base_url=MASTODON_BASE_URL
             )
             mastodon_api.log_in(
                 username=MASTODON_USERNAME,
                 password=MASTODON_PASSWORD,
-                to_file=config.FILES['credentials_mastodon_user'],
+                to_file=credentials_mastodon_user,
                 scopes=["read", "write"]
             )
         except MastodonError:

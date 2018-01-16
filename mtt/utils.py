@@ -18,7 +18,7 @@ class MTTThread(Thread):
                  status_associations, sent_status, group=None, target=None, name=None):
         super(MTTThread, self).__init__(
             group=group,
-            target=target, 
+            target=target,
             name=name
         )
 
