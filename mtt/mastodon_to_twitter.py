@@ -3,6 +3,7 @@ import re
 import time
 
 from mastodon import StreamListener
+from twitter.error import TwitterError
 from urllib.parse import urlparse
 
 from mtt import config, lock
@@ -125,7 +126,7 @@ class TwitterPublisher(MTTThread):
 
                 # Don't cross-post replies
                 if len(content_clean) != 0 and content_clean[0] == '@':
-                    print('Skipping toot "' + content_clean + '" - is a reply.')
+                    lgt('Skipping toot "' + content_clean + '" - is a reply.')
                     return
 
                 if config.TWEET_CW_PREFIX and toot['spoiler_text']:
@@ -198,7 +199,7 @@ class TwitterPublisher(MTTThread):
                                     since_tweet_id = reply_to
                                     post_success = True
 
-                            except:
+                            except TwitterError:
                                 if retry_counter < config.MASTODON_RETRIES:
                                     retry_counter += 1
                                     time.sleep(config.MASTODON_RETRY_DELAY)
@@ -216,7 +217,7 @@ class TwitterPublisher(MTTThread):
 
                 except Exception as e:
                     lgt("Encountered error after " + str(config.MASTODON_RETRIES) + " retries. Not retrying.")
-                    raise e
+                    print(e)
 
                 # From times to times we update the Twitter URL length.
                 self.publisher.update_twitter_link_length()
