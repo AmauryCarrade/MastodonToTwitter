@@ -66,6 +66,9 @@ class MastodonPublisher(MTTThread):
             if self.is_tweet_sent_by_us(tweet_id):
                 continue
 
+            if tweet['user']['id_str'] != str(self.tw_account_id):
+                continue
+
             is_retweet = False
 
             content = MastodonPublisher._get_tweet_full_text(tweet)
