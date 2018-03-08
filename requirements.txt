@@ -1,2 +1,6 @@
-Mastodon.py>=1.0.6,<=1.0.7
-python-twitter>=3.2
+Mastodon.py
+path.py
+requests>=2.18
+
+# Python-Twitter: version 3.3.1 or later is required for 280-characters support.
+git+https://github.com/bear/python-twitter.git
