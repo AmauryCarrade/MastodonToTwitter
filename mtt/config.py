@@ -23,6 +23,10 @@ POST_ON_TWITTER = True
 # Should we slice long messages from Mastodon on Twitter, or cut them
 SPLIT_ON_TWITTER = True
 
+# If true and a toot needs to be split on Twitter, and if this toot starts with or ends with one or more hashtags,
+# these hashtags will be added to every tweet posted and not only the first/last one.
+DISTRIBUTE_HASHTAGS_ON_TWITTER = True
+
 # Manage visibility of your toot. Value are "private", "unlisted" or "public"
 TOOT_VISIBILITY = "public"
 

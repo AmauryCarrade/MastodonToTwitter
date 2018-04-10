@@ -129,6 +129,10 @@ def calc_expected_status_length(status, short_url_length=23):
     return status_length
 
 
+re_hashtag_begin = re.compile(r'^((?:#[a-zA-Z0-9]+(?:\s+)?)+)')
+re_hashtag_end = re.compile(r'((?:#[a-zA-Z0-9]+(?:\s+)?)+)$')
+
+
 def split_status(status, max_length, split=True, url=None, url_length=None):
     """
     Split toots, if need be, using Many magic numbers.
@@ -147,26 +151,55 @@ def split_status(status, max_length, split=True, url=None, url_length=None):
 
     max_length -= 6
 
+    hashtags_begin = ''
+    hashtags_end = ''
+
+    if split and config.DISTRIBUTE_HASHTAGS_ON_TWITTER:
+        match = re_hashtag_begin.search(status)
+        if match:
+            hashtags_begin = match.group(1)
+            status = re_hashtag_begin.sub('', status).lstrip()
+        match = re_hashtag_end.search(status)
+        print(match)
+        print(match.group(1))
+        print(re_hashtag_end.sub('', status))
+        if match:
+            hashtags_end = match.group(1)
+            status = re_hashtag_end.sub('', status).rstrip()
+
+        # Ensures the hashtags will fit
+        while len(hashtags_begin) + len(hashtags_end) > max_length:
+            if hashtags_end:
+                hashtags_end = ' '.join(hashtags_end.split(' ')[:-1])
+            elif hashtags_begin:
+                hashtags_begin = ' '.join(hashtags_begin.split(' ')[:-1])
+            else:
+                break
+
+    hashtags_begin = (hashtags_begin.lstrip() + (' ' if not hashtags_begin.endswith('\n') else '')) if hashtags_begin else ''
+    hashtags_end = (' ' + hashtags_end.rstrip()) if hashtags_end else ''
+    hashtags_len = len(hashtags_begin) + len(hashtags_end)
+
     if calc_expected_status_length(status, short_url_length=url_length) > max_length:
         current_part = ''
         for next_word in status.split(' '):
             # Need to split here?
-            if calc_expected_status_length(current_part + ' ' + next_word, short_url_length=url_length) > max_length:
-                space_left = max_length - 5 - calc_expected_status_length(current_part, short_url_length=url_length) - 1
+            if calc_expected_status_length(current_part + ' ' + next_word, short_url_length=url_length) + len(hashtags_end) > max_length:
+                space_left = max_length - 5 - (calc_expected_status_length(current_part, short_url_length=url_length) + len(hashtags_end)) - 1
 
                 if split:
                     # Want to split word?
                     if len(next_word) > 30 and space_left > 5 and not twitter.twitter_utils.is_url(next_word):
-                        current_part = current_part + " " + next_word[:space_left]
+                        current_part = current_part + ' ' + next_word[:space_left] + hashtags_end
                         content_parts.append(current_part)
-                        current_part = next_word[space_left:]
+                        current_part = hashtags_begin + next_word[space_left:]
                     else:
-                        content_parts.append(current_part)
-                        current_part = next_word
+                        content_parts.append(current_part + hashtags_end)
+                        current_part = hashtags_begin + next_word
 
                     # Split potential overlong word in current_part
-                    while len(current_part) > max_length - 5:
-                        content_parts.append(current_part[:max_length - 5])
+                    while len(current_part) + hashtags_len > max_length - 5:
+                        content_parts.append(hashtags_begin + current_part[:max_length - 5 - hashtags_len] + hashtags_end)
                         current_part = current_part[max_length - 5:]
                 else:
                     space_for_suffix = len('… ') + url_length
@@ -179,7 +212,7 @@ def split_status(status, max_length, split=True, url=None, url_length=None):
 
         # Insert last part
         if len(current_part.strip()) != 0 or len(content_parts) == 0:
-            content_parts.append(current_part.strip())
+            content_parts.append(current_part.strip() + hashtags_end)
 
     else:
         content_parts.append(status)
