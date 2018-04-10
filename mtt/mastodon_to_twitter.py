@@ -3,6 +3,7 @@ import re
 import time
 
 from mastodon import StreamListener
+from twitter import TwitterError
 from urllib.parse import urlparse
 
 from mtt import config, lock
@@ -14,7 +15,7 @@ class TwitterPublisher(MTTThread):
                  status_associations, sent_status, group=None, target=None, name=None):
         super(TwitterPublisher, self).__init__(
             group=group,
-            target=target, 
+            target=target,
             name=name,
             mastodon_api=mastodon_api,
             twitter_api=twitter_api,
@@ -44,7 +45,8 @@ class TwitterPublisher(MTTThread):
     def update_twitter_link_length(self):
         if time.time() - self.last_url_len_update > 60 * 60 * 24:
             self.twitter_api._config = None
-            self.url_length = max(self.twitter_api.GetShortUrlLength(False), self.twitter_api.GetShortUrlLength(True)) + 1
+            self.url_length = max(self.twitter_api.GetShortUrlLength(False),
+                                  self.twitter_api.GetShortUrlLength(True)) + 1
             self.last_url_len_update = time.time()
             lgt(f'Updated expected short URL length - it is now {self.url_length} characters.')
 
@@ -202,7 +204,7 @@ class TwitterPublisher(MTTThread):
                                     since_tweet_id = reply_to
                                     post_success = True
 
-                            except:
+                            except TwitterError:
                                 if retry_counter < config.MASTODON_RETRIES:
                                     retry_counter += 1
                                     time.sleep(config.MASTODON_RETRY_DELAY)
@@ -220,7 +222,7 @@ class TwitterPublisher(MTTThread):
 
                 except Exception as e:
                     lgt("Encountered error after " + str(config.MASTODON_RETRIES) + " retries. Not retrying.")
-                    raise e
+                    print(e)
 
                 # From times to times we update the Twitter URL length.
                 self.publisher.update_twitter_link_length()

@@ -13,7 +13,7 @@ class MastodonPublisher(MTTThread):
                  status_associations, sent_status, group=None, target=None, name=None):
         super(MastodonPublisher, self).__init__(
             group=group,
-            target=target, 
+            target=target,
             name=name,
             mastodon_api=mastodon_api,
             twitter_api=twitter_api,
@@ -64,6 +64,9 @@ class MastodonPublisher(MTTThread):
             tweet_id = tweet['id']
 
             if self.is_tweet_sent_by_us(tweet_id):
+                continue
+
+            if tweet['user']['id_str'] != str(self.tw_account_id):
                 continue
 
             is_retweet = False
@@ -141,8 +144,10 @@ class MastodonPublisher(MTTThread):
                     content_toot = re.sub(url['url'], url['expanded_url'], content_toot)
 
             if cws:
-                warning = config.TWEET_CW_SEPARATOR.join([cw.strip() for cw in cws]) if config.TWEET_CW_ALLOW_MULTI else cws[0].strip()
-                content_toot = config.TWEET_CW_REGEXP.sub('', content_toot, count=0 if config.TWEET_CW_ALLOW_MULTI else 1).strip()
+                warning = (config.TWEET_CW_SEPARATOR.join([cw.strip() for cw in cws]) if config.TWEET_CW_ALLOW_MULTI
+                           else cws[0].strip())
+                content_toot = config.TWEET_CW_REGEXP.sub('', content_toot, count=(0 if config.TWEET_CW_ALLOW_MULTI
+                                                                                   else 1)).strip()
 
             if media_attachments:
                 for attachment in media_attachments:

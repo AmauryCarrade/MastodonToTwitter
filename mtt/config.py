@@ -2,7 +2,7 @@
 # This is the MastodonToTwitter corssposter configuration file.
 # You can configure the behavior of the crossposter here.
 #
-# Credentials are not stored here. To setup credentials, run the 
+# Credentials are not stored here. To setup credentials, run the
 # program once—they will be prompted at the first run. To update
 # credentials, remove all *.secret files and run the program.
 #
@@ -53,7 +53,7 @@ TWEET_CW_PREFIX = '[TW ⋅ {}]\n\n'
 # the original tweet. Except if TWEET_CW_ALLOW_MULTI is set to False, then
 # only the first one will be considered.
 # To disable content warnings from Twitter to Mastodon, set to None.
-TWEET_CW_REGEXP = re.compile(r'(?:[\[(])(?:(?:(?:C|T)W)|SPOIL(?:ER)?)(?:[\s\-\.⋅,:–—]+)([^\]]+)(?:[\])])', re.IGNORECASE)
+TWEET_CW_REGEXP = re.compile(r'(?:[\[(])(?:(?:(?:C|T)W)|SPOIL(?:ER)?)(?:[\s\-\.⋅,:–—]+)([^\]]+)(?:[\])])', re.IGNORECASE)  # noqa
 TWEET_CW_ALLOW_MULTI = True
 TWEET_CW_SEPARATOR = ', '
 
