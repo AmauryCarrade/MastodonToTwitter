@@ -98,6 +98,10 @@ class TwitterPublisher(MTTThread):
                 if self.publisher.is_toot_sent_by_us(toot_id):
                     return
 
+                if toot['visibility'] not in config.TOOT_VISIBILITY_REQUIRED_TO_TRANSFER:
+                    lgt(f'Skipping toot {toot["id"]} - invalid visibility ({toot["visibility"]})')
+                    return
+
                 content = toot["content"]
                 media_attachments = toot["media_attachments"]
 
@@ -125,7 +129,7 @@ class TwitterPublisher(MTTThread):
 
                 # Don't cross-post replies
                 if len(content_clean) != 0 and content_clean[0] == '@':
-                    print('Skipping toot "' + content_clean + '" - is a reply.')
+                    lgt('Skipping toot "' + content_clean + '" - is a reply.')
                     return
 
                 if config.TWEET_CW_PREFIX and toot['spoiler_text']:

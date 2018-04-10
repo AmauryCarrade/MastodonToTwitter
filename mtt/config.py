@@ -26,6 +26,11 @@ SPLIT_ON_TWITTER = True
 # Manage visibility of your toot. Value are "private", "unlisted" or "public"
 TOOT_VISIBILITY = "public"
 
+# Toots with the visibilities listed here will be transferred to Twitter, and only
+# them. Possible values: 'public', 'unlisted', 'private', 'direct'.
+# /!\ ADDING 'direct' HERE WILL TRANSFER ALL PRIVATE DIRECT MESSAGES TO TWITTER PUBLICLY.
+TOOT_VISIBILITY_REQUIRED_TO_TRANSFER = ['public', 'unlisted']
+
 # How often to retry when posting fails
 MASTODON_RETRIES = 3
 TWITTER_RETRIES = 3
