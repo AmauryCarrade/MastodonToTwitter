@@ -12,6 +12,7 @@ RUN apk add --no-cache git g++ make libffi-dev openssl-dev && \
     touch mtt_mastodon_client.secret \
           mtt_mastodon_user.secret \
           mtt_mastodon_server.secret \
-          mtt_twitter.secret
+          mtt_twitter.secret && \
+    apk del git g++ make libffi-dev openssl-dev
 
 CMD ["python3","-m","mtt" ]
