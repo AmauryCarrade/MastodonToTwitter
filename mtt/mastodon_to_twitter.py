@@ -229,6 +229,6 @@ class TwitterPublisher(MTTThread):
 
         # Compatibility with multiple versions of Mastodon.py
         try:
-            self.mastodon_api.stream_user(TootsListener(self), async=False)
+            self.mastodon_api.stream_user(TootsListener(self), run_async=False)
         except AttributeError:
             self.mastodon_api.user_stream(TootsListener(self), async=False)
