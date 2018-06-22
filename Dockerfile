@@ -6,7 +6,8 @@ WORKDIR /usr/src/app
 
 # Copy Source and requirements
 ADD ["requirements.txt", "__init__.py", "mtt/", "/usr/src/app/"]
-RUN pip3 install --no-cache-dir -r requirements.txt && \
+RUN apk add --no-cache git g++ make libffi-dev openssl-dev && \
+    pip3 install --no-cache-dir -r requirements.txt && \
     touch mtt_mastodon_client.secret \
           mtt_mastodon_user.secret \
           mtt_mastodon_server.secret \
