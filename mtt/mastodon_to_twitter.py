@@ -228,7 +228,9 @@ class TwitterPublisher(MTTThread):
                 self.publisher.update_twitter_link_length()
 
         # Compatibility with multiple versions of Mastodon.py
+        # async is a keyword in Python 3.7
+        kwargs = {"async": False}
         try:
-            self.mastodon_api.stream_user(TootsListener(self), async=False)
+            self.mastodon_api.stream_user(TootsListener(self), **kwargs)
         except AttributeError:
-            self.mastodon_api.user_stream(TootsListener(self), async=False)
+            self.mastodon_api.user_stream(TootsListener(self), **kwargs)
