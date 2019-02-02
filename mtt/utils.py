@@ -160,9 +160,6 @@ def split_status(status, max_length, split=True, url=None, url_length=None):
             hashtags_begin = match.group(1)
             status = re_hashtag_begin.sub('', status).lstrip()
         match = re_hashtag_end.search(status)
-        print(match)
-        print(match.group(1))
-        print(re_hashtag_end.sub('', status))
         if match:
             hashtags_end = match.group(1)
             status = re_hashtag_end.sub('', status).rstrip()

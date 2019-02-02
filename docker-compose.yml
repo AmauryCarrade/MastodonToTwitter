@@ -5,7 +5,4 @@ services:
     image: mastodontotwitter
     tty: true
     volumes:
-      - $PWD/mtt_mastodon_client.secret:/usr/src/app/mtt_mastodon_client.secret
-      - $PWD/mtt_mastodon_server.secret:/usr/src/app/mtt_mastodon_server.secret
-      - $PWD/mtt_mastodon_user.secret:/usr/src/app/mtt_mastodon_user.secret
-      - $PWD/mtt_twitter.secret:/usr/src/app/mtt_twitter.secret
+      - $PWD/config/:/usr/src/app/config
