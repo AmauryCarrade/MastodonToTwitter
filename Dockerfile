@@ -4,6 +4,10 @@ MAINTAINER Tyler Britten
 RUN mkdir -p /usr/src/app
 WORKDIR /usr/src/app
 
+RUN apk update && \
+    apk upgrade && \
+    apk add git build-base py3-cffi libffi-dev openssl-dev
+
 # Copy Source and requirements
 ADD ["requirements.txt", "__init__.py", "mtt/", "/usr/src/app/"]
 RUN pip3 install --no-cache-dir -r requirements.txt && \
