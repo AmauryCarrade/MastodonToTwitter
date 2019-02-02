@@ -13,7 +13,7 @@ import twitter
 
 from path import Path
 
-ROOT_PATH = Path(os.path.dirname(os.path.realpath(__file__))).parent
+ROOT_PATH = Path(os.path.dirname(os.path.realpath(__file__))).parent / 'config'
 
 
 # Enable repost on services

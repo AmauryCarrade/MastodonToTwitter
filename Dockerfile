@@ -9,11 +9,8 @@ RUN apk update && \
     apk add git build-base py3-cffi libffi-dev openssl-dev
 
 # Copy Source and requirements
-ADD ["requirements.txt", "__init__.py", "mtt/", "/usr/src/app/"]
-RUN pip3 install --no-cache-dir -r requirements.txt && \
-    touch mtt_mastodon_client.secret \
-          mtt_mastodon_user.secret \
-          mtt_mastodon_server.secret \
-          mtt_twitter.secret
+ADD ["requirements.txt", "__init__.py", "/usr/src/app/"]
+RUN pip3 install -r requirements.txt
 
+ADD "mtt" "/usr/src/app/mtt/"
 CMD ["python","-m","mtt" ]
