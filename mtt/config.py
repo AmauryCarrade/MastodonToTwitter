@@ -10,11 +10,21 @@
 import os
 import re
 import twitter
+import warnings
 
 from path import Path
 
-ROOT_PATH = Path(os.path.dirname(os.path.realpath(__file__))).parent / 'config'
-
+# Secrets can go in a config/ directory (so they can be mounted inside a
+# docker image), or can go in the root of git repository (so we don't
+# break things for existing users)
+_PARENT_DIR = Path(os.path.dirname(os.path.realpath(__file__))).parent
+if (ROOT_PATH / 'mtt_mastodon_server.secret').exists():
+    warnings.warn(
+        'Using config from the base of the git repository, but '
+        'you might like to move this to a config/ subdirectory')
+    ROOT_PATH = _PARENT_DIR
+else:
+    ROOT_PATH = _PARENT_DIR / 'config'
 
 # Enable repost on services
 POST_ON_MASTODON = True
