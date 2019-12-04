@@ -1,4 +1,4 @@
-Mastodon.py
+Mastodon.py<1.3
 path.py
 requests>=2.18
 
